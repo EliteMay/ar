@@ -1,5 +1,5 @@
-// ASMRTube timestamp parser v1.5
-// Parses YouTube comments even when line breaks collapse into one long line.
+// ASMRTube timestamp parser v1.6
+// Parses collapsed YouTube comments and only creates groups when the following timestamp is a child entry.
 (function(){
   function cleanText(value){
     return String(value||'')
@@ -46,25 +46,21 @@
     let m;
     while((m=re.exec(source))){
       const token=m[1]||m[2];
-      if(!token)continue;
-      tokens.push({token,start:m.index,end:re.lastIndex});
+      if(token)tokens.push({token,start:m.index,end:re.lastIndex});
     }
     return tokens;
   }
 
   function splitSegment(segment){
-    let s=String(segment||'')
+    return String(segment||'')
       .replace(/\r/g,'')
-      .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g,'$1');
-
-    const pieces=s
+      .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g,'$1')
       .split(/\n+|[ \t\u3000]{2,}/)
       .map(cleanText)
       .filter(Boolean);
-    return pieces;
   }
 
-  function headingFromPrefix(prefix){
+  function prefixHeading(prefix){
     const pieces=splitSegment(prefix);
     if(!pieces.length)return '';
     return cleanHeading(pieces[pieces.length-1]);
@@ -75,35 +71,45 @@
     const tokens=findTimestampTokens(source);
     if(!tokens.length)return [];
 
-    const out=[];
-    let group=headingFromPrefix(source.slice(0,tokens[0].start));
-
-    for(let i=0;i<tokens.length;i++){
-      const token=tokens[i];
+    // First pass: determine each timestamp's own label and the possible heading after it.
+    const entries=tokens.map((token,i)=>{
       const next=tokens[i+1];
-      const time=window.parseTime?window.parseTime(token.token):null;
-      if(time==null)continue;
-
       const segment=source.slice(token.end,next?next.start:source.length);
       const pieces=splitSegment(segment);
-      let label=pieces[0]||'タイムスタンプ';
-      label=cleanText(label)||'タイムスタンプ';
+      const label=cleanText(pieces[0]||'')||'タイムスタンプ';
+      const candidate=pieces.length>=2?cleanHeading(pieces[pieces.length-1]):'';
+      return {
+        token:token.token,
+        label,
+        candidate: candidate&&!isChildLabel(candidate)?candidate:''
+      };
+    });
 
-      let nextGroup='';
-      if(pieces.length>=2){
-        const candidate=cleanHeading(pieces[pieces.length-1]);
-        if(candidate&&!isChildLabel(candidate))nextGroup=candidate;
-      }
+    const out=[];
+    let activeGroup='';
+    const firstPrefix=prefixHeading(source.slice(0,tokens[0].start));
+    if(firstPrefix&&isChildLabel(entries[0]?.label))activeGroup=firstPrefix;
 
-      const rowGroup=group&&isChildLabel(label)?group:'';
-      out.push({time,label,group:rowGroup,tags:timestampTags(label,rowGroup)});
+    for(let i=0;i<entries.length;i++){
+      const entry=entries[i];
+      const time=window.parseTime?window.parseTime(entry.token):null;
+      if(time==null)continue;
 
-      if(nextGroup){
-        group=nextGroup;
-      }else if(rowGroup){
-        // Keep current group for the next short child label.
+      const child=isChildLabel(entry.label);
+      const rowGroup=activeGroup&&child?activeGroup:'';
+      out.push({time,label:entry.label,group:rowGroup,tags:timestampTags(entry.label,rowGroup)});
+
+      const nextEntry=entries[i+1];
+      const nextIsChild=!!nextEntry&&isChildLabel(nextEntry.label);
+
+      // A trailing phrase becomes a heading only when the NEXT timestamp is a child row.
+      // Example: "7:13 喋りながらの移動  綿棒 [10:48] 右" -> 綿棒 group.
+      if(entry.candidate&&nextIsChild){
+        activeGroup=entry.candidate;
+      }else if(rowGroup&&nextIsChild){
+        // Continue the same group only across consecutive child rows.
       }else{
-        group='';
+        activeGroup='';
       }
     }
 
@@ -117,7 +123,7 @@
 
 (function loadAsmrtubeEnhancements(){
   const scripts=[
-    ['timestamp-ui.js?v=1.5','asmrTimestampUi'],
+    ['timestamp-ui.js?v=1.6','asmrTimestampUi'],
     ['ui-enhancements.js?v=1.5','asmrProductUi']
   ];
   for(const [src,key] of scripts){
