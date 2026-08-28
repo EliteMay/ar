@@ -1,4 +1,4 @@
-// ASMRTube timestamp parser v1.7
+// ASMRTube timestamp parser v1.8
 // Parses collapsed YouTube comments and only creates groups when the following timestamp is a child entry.
 (function(){
   function cleanText(value){
@@ -120,8 +120,8 @@
 
 (function loadAsmrtubeEnhancements(){
   const scripts=[
-    ['timestamp-ui.js?v=1.7','asmrTimestampUi'],
-    ['ui-enhancements.js?v=1.7','asmrProductUi']
+    ['timestamp-ui.js?v=1.8','asmrTimestampUi'],
+    ['ui-enhancements.js?v=1.8','asmrProductUi']
   ];
   for(const [src,key] of scripts){
     if(document.querySelector(`script[data-${key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())}]`))continue;
