@@ -1,0 +1,32 @@
+/* ASMRTube-specific overrides on top of the LyricTube-style base CSS. */
+.workspace{grid-template-columns:minmax(520px,1fr) minmax(300px,340px);align-items:start}
+.timestamp-panel{min-height:0;height:clamp(300px,48vh,480px);align-self:start}
+.timestamp-head{padding:11px 13px;min-height:58px}
+.timestamp-head h3{font-size:16px;display:flex;align-items:center;gap:7px}
+.timestamp-head .eyebrow{font-size:8px;margin-bottom:2px}
+.timestamp-count{min-width:24px;height:20px;padding:0 6px;display:inline-grid;place-items:center;border-radius:999px;background:rgba(255,255,255,.055);color:var(--muted);font-size:10px;font-weight:800}
+.timestamp-tools .ghost-btn{padding:7px 9px;border-radius:9px;font-size:11px}
+.timestamp-view{flex:1;min-height:0;max-height:none;overflow:auto;padding:5px 6px 8px;scrollbar-gutter:stable}
+.timestamp-view.empty{padding:18px}
+.timestamp-view .empty-copy{font-size:12px;line-height:1.45;gap:5px}
+.timestamp-row{display:grid;grid-template-columns:58px minmax(0,1fr) 24px;gap:3px;align-items:center;min-height:34px;padding:2px 4px;border-radius:8px;border:1px solid transparent}
+.timestamp-row:hover{background:rgba(255,255,255,.035);border-color:var(--border)}
+.timestamp-row.active{background:var(--accentSoft);border-color:rgba(139,92,246,.22)}
+.timestamp-time,.timestamp-label{border:0;background:transparent;cursor:pointer;min-width:0;padding:5px 4px;line-height:1.2}
+.timestamp-time{color:#cdbdff;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;text-align:left}
+.timestamp-label{color:#cbd0d7;font-size:12px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.timestamp-row.active .timestamp-label{color:var(--text);font-weight:700}
+.timestamp-delete{width:24px;height:24px;padding:0;display:grid;place-items:center;border:0;background:transparent;color:#ff9292;cursor:pointer;font-size:13px;opacity:.22;border-radius:6px}
+.timestamp-row:hover .timestamp-delete,.timestamp-delete:focus-visible{opacity:1}
+.timestamp-index{display:none}
+.metadata-url-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.metadata-url-row .ghost-btn{height:42px;white-space:nowrap;padding:8px 11px}
+.field-hint{display:block;color:var(--muted);font-size:11px;font-weight:500;line-height:1.45;margin-top:2px}
+.field-hint.loading{color:#cdbdff}
+.field-hint.success{color:#a8d7b5}
+.field-hint.error{color:#ffaaaa}
+.timestamp-dialog textarea{min-height:120px}
+.timestamp-preview{max-height:240px}
+@media(max-width:1120px){.workspace{grid-template-columns:1fr}.timestamp-panel{height:400px;width:100%}}
+@media(max-width:760px){.timestamp-panel{height:350px}.timestamp-head{padding:10px 11px}.timestamp-row{grid-template-columns:54px minmax(0,1fr) 24px}.metadata-url-row{grid-template-columns:1fr}.metadata-url-row .ghost-btn{height:auto}}
+@media(max-width:480px){.timestamp-panel{height:320px}.timestamp-label{font-size:11px}.timestamp-time{font-size:10px}}
