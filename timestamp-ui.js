@@ -1,18 +1,31 @@
-// Group-aware timestamp UI for ASMRTube v1.5
+// Group-aware timestamp UI for ASMRTube v1.6
 (function(){
   const $=s=>document.querySelector(s);
   const $$=s=>[...document.querySelectorAll(s)];
 
   const style=document.createElement('style');
   style.textContent=`
-    .timestamp-group{margin:10px 4px 4px;padding:7px 8px 5px;border-top:1px solid var(--border);color:#e5defe;font-size:11px;font-weight:800;letter-spacing:.04em}
-    .timestamp-group:first-child{margin-top:1px;border-top:0}
+    .timestamp-block{margin:7px 2px 10px;border:1px solid rgba(139,92,246,.18);border-radius:10px;background:rgba(139,92,246,.035);overflow:hidden}
+    .timestamp-group{margin:0;padding:8px 10px 6px;border-bottom:1px solid rgba(139,92,246,.16);color:#e5defe;font-size:11px;font-weight:800;letter-spacing:.04em;background:rgba(139,92,246,.045)}
+    .timestamp-block .timestamp-row{margin:0 4px;border-radius:7px}
+    .timestamp-block .timestamp-row:last-child{margin-bottom:4px}
+    .timestamp-standalone{margin:1px 0}
+    .timestamp-block + .timestamp-standalone,.timestamp-standalone + .timestamp-block{margin-top:9px}
+    .timestamp-block + .timestamp-standalone{border-top:1px solid rgba(255,255,255,.055);padding-top:6px}
     .preview-grouped-row{display:grid;grid-template-columns:minmax(95px,.7fr) 82px minmax(0,1.5fr);gap:7px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:7px;background:#0d1014}
     .preview-grouped-row input{margin:0;min-width:0}
     .preview-grouped-row input[data-k="group"]{color:#d7ccff}
     @media(max-width:620px){.preview-grouped-row{grid-template-columns:1fr 72px}.preview-grouped-row input[data-k="label"]{grid-column:1/-1}}
   `;
   document.head.appendChild(style);
+
+  function rowHtml(t,i,extraClass=''){
+    return `<div class="timestamp-row ${extraClass}" data-time="${t.time}">
+      <button class="timestamp-time timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${fmt(t.time)}</button>
+      <button class="timestamp-label timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${esc(t.label)}</button>
+      <button class="timestamp-delete" data-index="${i}" title="削除">×</button>
+    </div>`;
+  }
 
   window.renderTimestamps=function(){
     const x=typeof itemById==='function'?itemById(state.selectedId):null;
@@ -27,20 +40,26 @@
 
     rows.sort((a,b)=>a.time-b.time);
     view.className='timestamp-view';
-    let lastGroup='';
     let html='';
-    rows.forEach((t,i)=>{
-      const group=String(t.group||'').trim();
-      if(group&&group!==lastGroup)html+=`<div class="timestamp-group">${esc(group)}</div>`;
-      lastGroup=group;
-      html+=`<div class="timestamp-row" data-time="${t.time}">
-        <button class="timestamp-time timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${fmt(t.time)}</button>
-        <button class="timestamp-label timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${esc(t.label)}</button>
-        <button class="timestamp-delete" data-index="${i}" title="削除">×</button>
-      </div>`;
-    });
-    view.innerHTML=html;
 
+    for(let i=0;i<rows.length;){
+      const group=String(rows[i].group||'').trim();
+      if(group){
+        html+=`<div class="timestamp-block"><div class="timestamp-group">${esc(group)}</div>`;
+        let j=i;
+        while(j<rows.length&&String(rows[j].group||'').trim()===group){
+          html+=rowHtml(rows[j],j);
+          j++;
+        }
+        html+='</div>';
+        i=j;
+      }else{
+        html+=rowHtml(rows[i],i,'timestamp-standalone');
+        i++;
+      }
+    }
+
+    view.innerHTML=html;
     $$('.timestamp-jump').forEach(b=>b.onclick=()=>playItem(x.id,Number(b.dataset.time)));
     $$('.timestamp-delete').forEach(b=>b.onclick=()=>{
       x.timestamps.splice(Number(b.dataset.index),1);
@@ -56,7 +75,7 @@
     $('#parseSummary').textContent=`${rows.length}件検出しました`;
     $('#timestampPreview').innerHTML=rows.map((t,i)=>`
       <div class="preview-grouped-row">
-        <input aria-label="見出し" data-i="${i}" data-k="group" value="${attr(t.group||'')}" placeholder="見出し">
+        <input aria-label="見出し" data-i="${i}" data-k="group" value="${attr(t.group||'')}" placeholder="見出しなし">
         <input aria-label="時間" data-i="${i}" data-k="time" value="${fmt(t.time)}">
         <input aria-label="内容" data-i="${i}" data-k="label" value="${attr(t.label)}">
       </div>`).join('');
@@ -79,8 +98,6 @@
     const x=itemById(state.selectedId);if(!x)return;
     x.timestamps=x.timestamps||[];
 
-    // Re-importing the same comment should repair old parser mistakes instead of
-    // stacking another row at the same second. Existing rows at imported times are replaced.
     const importedTimes=new Set(state.parsedTimestamps.map(t=>Number(t.time)));
     const before=x.timestamps.length;
     x.timestamps=x.timestamps.filter(t=>!importedTimes.has(Number(t.time)));
