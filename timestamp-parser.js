@@ -1,30 +1,29 @@
-// ASMRTube timestamp parser v1.4
-// Preserves section headings as groups instead of flattening them into every label.
+// ASMRTube timestamp parser v1.5
+// Parses YouTube comments even when line breaks collapse into one long line.
 (function(){
-  function cleanHeading(line){
-    let s=String(line||'').trim();
-    s=s.replace(/^[>・•●○■□★☆◆◇\-*#\s]+/,'').replace(/[：:]\s*$/,'').trim();
+  function cleanText(value){
+    return String(value||'')
+      .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g,'$1')
+      .replace(/https?:\/\/\S+/g,'')
+      .replace(/^[>・•●○■□★☆◆◇\-*#｜|:：\s]+/,'')
+      .replace(/[｜|\s]+$/,'')
+      .replace(/[ \t\u3000]+/g,' ')
+      .trim();
+  }
+
+  function cleanHeading(value){
+    const s=cleanText(value).replace(/[：:]$/,'').trim();
     if(!s||s.length>32)return '';
-    if(/https?:\/\/|www\.|youtu(?:\.be|be\.com)|タイムスタンプ|timestamp|チャプター|chapter|コメント|comment/i.test(s))return '';
+    if(/タイムスタンプ|timestamp|チャプター|chapter|コメント|comment/i.test(s))return '';
     if(/^[\d\s👍❤♥♡]+$/.test(s))return '';
     if(/[。！？!?]$/.test(s))return '';
     return s;
   }
 
-  function parseTimestampLine(line){
-    const markdown=line.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\([^)]+\)\s*(.*)$/);
-    if(markdown)return {token:markdown[1],label:(markdown[2]||'').trim()};
-
-    const plain=line.match(/(?:^|\s)(\d{1,2}:\d{2}(?::\d{2})?)(?:\s+|[-–—｜|:：]\s*)?(.*)$/);
-    if(plain)return {token:plain[1],label:(plain[2]||'').trim()};
-    return null;
-  }
-
   function isChildLabel(label){
-    const s=String(label||'').trim();
-    if(!s)return false;
-    if(s.length>14)return false;
-    return /^(右|左|右耳|左耳|両耳|両方|左右|交互|R|L|right|left|開始|start|前半|後半|奥|手前|浅め|深め|高速|低速|強め|弱め|片耳|両側)$/i.test(s);
+    const s=cleanText(label);
+    if(!s||s.length>14)return false;
+    return /^(右|左|右耳|左耳|両耳|両方|左右|交互|R|L|right|left|開始|start|前半|後半|奥|手前|浅め|深め|高速|低速|強め|弱め|片耳|両側|正面|真横)$/i.test(s);
   }
 
   function timestampTags(label,group=''){
@@ -32,7 +31,7 @@
     const tags=[];
     const add=t=>{if(!tags.includes(t))tags.push(t)};
     const rules=[
-      [/耳かき/,'耳かき'],[/梵天/,'梵天'],[/囁/,'囁き'],[/吐息/,'吐息'],[/耳ふ[ーぅう]|耳吹/,'耳ふー'],
+      [/耳かき|耳掻き/,'耳かき'],[/綿棒/,'綿棒'],[/指耳かき/,'指耳かき'],[/梵天/,'梵天'],[/囁|ささやき/,'囁き'],[/吐息/,'吐息'],[/耳ふ[ーぅう]|耳吹/,'耳ふー'],
       [/オノマトペ/,'オノマトペ'],[/タッピング/,'タッピング'],[/マッサージ/,'マッサージ'],[/添い寝/,'添い寝'],[/睡眠/,'睡眠'],
       [/(^|[\s　・／/])右(?:耳)?($|[\s　・／/])/,'右耳'],[/(^|[\s　・／/])左(?:耳)?($|[\s　・／/])/,'左耳'],[/両耳|両方|両側/,'両耳'],[/交互/,'交互']
     ];
@@ -40,48 +39,78 @@
     return tags;
   }
 
+  function findTimestampTokens(text){
+    const source=String(text||'');
+    const re=/\[(\d{1,2}:\d{2}(?::\d{2})?)\]\([^)]+\)|(\d{1,2}:\d{2}(?::\d{2})?)/g;
+    const tokens=[];
+    let m;
+    while((m=re.exec(source))){
+      // When a Markdown timestamp exists, the first alternative consumes the whole link,
+      // so the plain alternative will not create a duplicate for the same token.
+      const token=m[1]||m[2];
+      if(!token)continue;
+      tokens.push({token,start:m.index,end:re.lastIndex});
+    }
+    return tokens;
+  }
+
+  function splitSegment(segment){
+    let s=String(segment||'')
+      .replace(/\r/g,'')
+      .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g,'$1');
+
+    // A collapsed YouTube comment commonly leaves two or more spaces where a visual
+    // section break existed. Preserve that as a logical boundary.
+    const pieces=s
+      .split(/\n+|[ \t\u3000]{2,}/)
+      .map(cleanText)
+      .filter(Boolean);
+    return pieces;
+  }
+
+  function headingFromPrefix(prefix){
+    const pieces=splitSegment(prefix);
+    if(!pieces.length)return '';
+    return cleanHeading(pieces[pieces.length-1]);
+  }
+
   window.parseTimestampText=function(text){
-    const rawLines=String(text||'').split(/\r?\n/);
-    const lines=rawLines.map(s=>s.trim());
+    const source=String(text||'');
+    const tokens=findTimestampTokens(source);
+    if(!tokens.length)return [];
+
     const out=[];
-    let group='';
+    let group=headingFromPrefix(source.slice(0,tokens[0].start));
 
-    for(let i=0;i<lines.length;i++){
-      const line=lines[i];
-      if(!line)continue;
-
-      const parsed=parseTimestampLine(line);
-      if(!parsed){
-        const candidate=cleanHeading(line);
-        if(!candidate)continue;
-
-        let nextMeaningful='';
-        for(let j=i+1;j<lines.length;j++){
-          if(lines[j]){nextMeaningful=lines[j];break}
-        }
-        if(nextMeaningful&&parseTimestampLine(nextMeaningful))group=candidate;
-        continue;
-      }
-
-      const time=window.parseTime?window.parseTime(parsed.token):null;
+    for(let i=0;i<tokens.length;i++){
+      const token=tokens[i];
+      const next=tokens[i+1];
+      const time=window.parseTime?window.parseTime(token.token):null;
       if(time==null)continue;
 
-      let label=parsed.label.replace(/^[-–—｜|:：]+\s*/,'').trim();
+      const segment=source.slice(token.end,next?next.start:source.length);
+      const pieces=splitSegment(segment);
+      let label=pieces[0]||'タイムスタンプ';
+      label=cleanText(label)||'タイムスタンプ';
 
-      if(!label){
-        let nextIndex=-1;
-        for(let j=i+1;j<lines.length;j++){
-          if(lines[j]){nextIndex=j;break}
-        }
-        if(nextIndex>=0&&!parseTimestampLine(lines[nextIndex])&&isChildLabel(lines[nextIndex])){
-          label=lines[nextIndex];
-          i=nextIndex;
-        }
+      // If text remains after the current label before the next timestamp, it is most
+      // often a section heading such as "耳ふー", "綿棒", or "指耳かき".
+      let nextGroup='';
+      if(pieces.length>=2){
+        const candidate=cleanHeading(pieces[pieces.length-1]);
+        if(candidate&&!isChildLabel(candidate))nextGroup=candidate;
       }
 
-      if(!label)label='タイムスタンプ';
       const rowGroup=group&&isChildLabel(label)?group:'';
       out.push({time,label,group:rowGroup,tags:timestampTags(label,rowGroup)});
+
+      if(nextGroup){
+        group=nextGroup;
+      }else if(rowGroup){
+        // Continue the current section for the next short child label.
+      }else{
+        group='';
+      }
     }
 
     return out
@@ -94,7 +123,7 @@
 
 (function loadAsmrtubeEnhancements(){
   const scripts=[
-    ['timestamp-ui.js?v=1.4','asmrTimestampUi'],
+    ['timestamp-ui.js?v=1.5','asmrTimestampUi'],
     ['ui-enhancements.js?v=1.4','asmrProductUi']
   ];
   for(const [src,key] of scripts){
