@@ -1,4 +1,4 @@
-// ASMRTube product UI enhancements v1.4
+// ASMRTube product UI enhancements v1.5
 (function(){
   const SETTINGS_KEY='asmrtube.settings.v1';
   const $=s=>document.querySelector(s);
@@ -74,7 +74,7 @@
   if(sidebar){
     const version=document.createElement('div');
     version.className='sidebar-version';
-    version.innerHTML='<span>ASMRTUBE</span><strong>v1.4</strong>';
+    version.innerHTML='<span>ASMRTUBE</span><strong>v1.5</strong>';
     sidebar.appendChild(version);
   }
 
