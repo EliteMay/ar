@@ -45,8 +45,6 @@
     const tokens=[];
     let m;
     while((m=re.exec(source))){
-      // When a Markdown timestamp exists, the first alternative consumes the whole link,
-      // so the plain alternative will not create a duplicate for the same token.
       const token=m[1]||m[2];
       if(!token)continue;
       tokens.push({token,start:m.index,end:re.lastIndex});
@@ -59,8 +57,6 @@
       .replace(/\r/g,'')
       .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g,'$1');
 
-    // A collapsed YouTube comment commonly leaves two or more spaces where a visual
-    // section break existed. Preserve that as a logical boundary.
     const pieces=s
       .split(/\n+|[ \t\u3000]{2,}/)
       .map(cleanText)
@@ -93,8 +89,6 @@
       let label=pieces[0]||'タイムスタンプ';
       label=cleanText(label)||'タイムスタンプ';
 
-      // If text remains after the current label before the next timestamp, it is most
-      // often a section heading such as "耳ふー", "綿棒", or "指耳かき".
       let nextGroup='';
       if(pieces.length>=2){
         const candidate=cleanHeading(pieces[pieces.length-1]);
@@ -107,7 +101,7 @@
       if(nextGroup){
         group=nextGroup;
       }else if(rowGroup){
-        // Continue the current section for the next short child label.
+        // Keep current group for the next short child label.
       }else{
         group='';
       }
@@ -124,7 +118,7 @@
 (function loadAsmrtubeEnhancements(){
   const scripts=[
     ['timestamp-ui.js?v=1.5','asmrTimestampUi'],
-    ['ui-enhancements.js?v=1.4','asmrProductUi']
+    ['ui-enhancements.js?v=1.5','asmrProductUi']
   ];
   for(const [src,key] of scripts){
     if(document.querySelector(`script[data-${key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())}]`))continue;
