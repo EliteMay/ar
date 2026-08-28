@@ -108,15 +108,7 @@
       if(!group){i++;continue}
       let j=i+1;
       while(j<rows.length&&String(rows[j].group||'').trim()===group)j++;
-      result.push({
-        name:group,
-        start:Number(rows[i].time)||0,
-        end:j<rows.length?Number(rows[j].time):Infinity,
-        rowStart:i,
-        rowEnd:j-1,
-        count:j-i,
-        index:result.length
-      });
+      result.push({name:group,start:Number(rows[i].time)||0,end:j<rows.length?Number(rows[j].time):Infinity,rowStart:i,rowEnd:j-1,count:j-i,index:result.length});
       i=j;
     }
     return result;
@@ -138,9 +130,7 @@
       state.player.seekTo(Number(time)||0,true);
       state.player.playVideo?.();
       if(typeof markRecent==='function')markRecent(x.id);
-    }else{
-      playItem(x.id,Number(time)||0);
-    }
+    }else playItem(x.id,Number(time)||0);
   }
 
   function selectChapter(index,{play=false}={}){
@@ -177,18 +167,13 @@
 
     let html='<div class="chapter-overview"><div class="chapter-overview-grid">';
     chapterRanges.forEach((c,i)=>{
-      html+=`<button class="chapter-card ${i===active?'active':''} ${i===selectedChapter?'selected':''}" data-select-chapter="${i}">
-        <span class="chapter-card-name">${esc(c.name)}</span><span class="chapter-card-time">${fmt(c.start)}</span><span class="chapter-card-count">${c.count}項目</span>
-      </button>`;
+      html+=`<button class="chapter-card ${i===active?'active':''} ${i===selectedChapter?'selected':''}" data-select-chapter="${i}"><span class="chapter-card-name">${esc(c.name)}</span><span class="chapter-card-time">${fmt(c.start)}</span><span class="chapter-card-count">${c.count}項目</span></button>`;
     });
-    if(standaloneCount){
-      html+=`<button class="chapter-other-card" id="openAllTimestamps"><span>その他のタイムスタンプ</span><span>${standaloneCount}件 →</span></button>`;
-    }
+    if(standaloneCount)html+=`<button class="chapter-other-card" id="openAllTimestamps"><span>その他のタイムスタンプ</span><span>${standaloneCount}件 →</span></button>`;
     html+='</div></div>';
 
     if(selected){
-      html+=`<div class="chapter-focus">
-        <div class="chapter-focus-head"><div class="chapter-focus-title"><strong>${esc(selected.name)}</strong><span>${fmt(selected.start)} ・ ${selected.count}項目</span></div><button class="chapter-focus-play" data-play-chapter="${selectedChapter}">▶ ここから再生</button></div>`;
+      html+=`<div class="chapter-focus"><div class="chapter-focus-head"><div class="chapter-focus-title"><strong>${esc(selected.name)}</strong><span>${fmt(selected.start)} ・ ${selected.count}項目</span></div><button class="chapter-focus-play" data-play-chapter="${selectedChapter}">▶ ここから再生</button></div>`;
       for(let i=selected.rowStart;i<=selected.rowEnd;i++)html+=rowHtml(rows[i],i);
       html+='</div>';
     }
@@ -210,13 +195,8 @@
       const group=String(rows[i].group||'').trim();
       if(group){
         const c=chapterRanges[chapterIndex];
-        const open=expandedChapters.has(chapterIndex)||chapterIndex===active||chapterIndex===selectedChapter;
-        html+=`<div class="timestamp-block ${open?'open':''} ${chapterIndex===active?'active-group':''}" data-chapter-index="${chapterIndex}">
-          <div class="timestamp-group-line">
-            <button class="timestamp-group-toggle" data-toggle-chapter="${chapterIndex}"><span class="timestamp-group-caret">▶</span><span class="timestamp-group-name">${esc(group)}</span><span class="timestamp-group-count">${c.count}</span></button>
-            <span class="timestamp-group-time">${fmt(c.start)}</span>
-            <button class="timestamp-group-play" data-play-chapter="${chapterIndex}" title="${attr(group)}の先頭から再生">▶</button>
-          </div><div class="timestamp-group-body">`;
+        const open=expandedChapters.has(chapterIndex)||chapterIndex===active;
+        html+=`<div class="timestamp-block ${open?'open':''} ${chapterIndex===active?'active-group':''}" data-chapter-index="${chapterIndex}"><div class="timestamp-group-line"><button class="timestamp-group-toggle" data-toggle-chapter="${chapterIndex}"><span class="timestamp-group-caret">▶</span><span class="timestamp-group-name">${esc(group)}</span><span class="timestamp-group-count">${c.count}</span></button><span class="timestamp-group-time">${fmt(c.start)}</span><button class="timestamp-group-play" data-play-chapter="${chapterIndex}" title="${attr(group)}の先頭から再生">▶</button></div><div class="timestamp-group-body">`;
         let j=i;
         while(j<rows.length&&String(rows[j].group||'').trim()===group){html+=rowHtml(rows[j],j);j++}
         html+='</div></div>';
@@ -237,7 +217,11 @@
       renderCurrentMode();
     });
     $$('[data-play-chapter]').forEach(b=>b.onclick=()=>{
-      const i=Number(b.dataset.playChapter);selectedChapter=i;expandedChapters.add(i);playAt(chapterRanges[i]?.start||0);renderCurrentMode();
+      const i=Number(b.dataset.playChapter);
+      selectedChapter=i;
+      expandedChapters.add(i);
+      playAt(chapterRanges[i]?.start||0);
+      renderCurrentMode();
     });
     bindCommonActions();
   }
@@ -283,24 +267,15 @@
         selectedChapter=active;
         expandedChapters.add(active);
         if(viewMode==='chapters')renderCurrentMode();
-        else{
-          $$('.timestamp-block').forEach(b=>b.classList.toggle('active-group',Number(b.dataset.chapterIndex)===active));
-        }
-      }else{
-        $$('.timestamp-block').forEach(b=>b.classList.remove('active-group'));
-      }
+        else $$('.timestamp-block').forEach(b=>b.classList.toggle('active-group',Number(b.dataset.chapterIndex)===active));
+      }else $$('.timestamp-block').forEach(b=>b.classList.remove('active-group'));
     }
   };
 
   window.showTimestampPreview=function(){
     const rows=state.parsedTimestamps;
     $('#parseSummary').textContent=`${rows.length}件検出しました`;
-    $('#timestampPreview').innerHTML=rows.map((t,i)=>`
-      <div class="preview-grouped-row">
-        <input aria-label="見出し" data-i="${i}" data-k="group" value="${attr(t.group||'')}" placeholder="見出しなし">
-        <input aria-label="時間" data-i="${i}" data-k="time" value="${fmt(t.time)}">
-        <input aria-label="内容" data-i="${i}" data-k="label" value="${attr(t.label)}">
-      </div>`).join('');
+    $('#timestampPreview').innerHTML=rows.map((t,i)=>`<div class="preview-grouped-row"><input aria-label="見出し" data-i="${i}" data-k="group" value="${attr(t.group||'')}" placeholder="見出しなし"><input aria-label="時間" data-i="${i}" data-k="time" value="${fmt(t.time)}"><input aria-label="内容" data-i="${i}" data-k="label" value="${attr(t.label)}"></div>`).join('');
     $('#saveTimestampsBtn').disabled=!rows.length;
     $$('#timestampPreview input').forEach(el=>el.onchange=()=>{
       const i=Number(el.dataset.i),key=el.dataset.k;
