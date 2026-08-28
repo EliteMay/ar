@@ -1,4 +1,4 @@
-// Group-aware timestamp UI for ASMRTube v1.4
+// Group-aware timestamp UI for ASMRTube v1.5
 (function(){
   const $=s=>document.querySelector(s);
   const $$=s=>[...document.querySelectorAll(s)];
@@ -78,6 +78,14 @@
   function saveGroupedTimestamps(){
     const x=itemById(state.selectedId);if(!x)return;
     x.timestamps=x.timestamps||[];
+
+    // Re-importing the same comment should repair old parser mistakes instead of
+    // stacking another row at the same second. Existing rows at imported times are replaced.
+    const importedTimes=new Set(state.parsedTimestamps.map(t=>Number(t.time)));
+    const before=x.timestamps.length;
+    x.timestamps=x.timestamps.filter(t=>!importedTimes.has(Number(t.time)));
+    const removed=before-x.timestamps.length;
+
     for(const t of state.parsedTimestamps){
       const group=String(t.group||'').trim();
       if(!x.timestamps.some(z=>z.time===t.time&&z.label===t.label&&String(z.group||'')===group))x.timestamps.push({...t,group});
@@ -87,7 +95,7 @@
     $('#timestampDialog').close();
     window.renderTimestamps();
     renderFilters();
-    toast('タイムスタンプを追加しました');
+    toast(removed?`タイムスタンプを再解析して${removed}件置き換えました`:'タイムスタンプを追加しました');
   }
 
   const saveBtn=$('#saveTimestampsBtn');
