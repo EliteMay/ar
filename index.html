@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0a0b0e">
   <title>ASMRTube</title>
   <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="asmr-overrides.css?v=3">
 </head>
 <body>
   <div class="app-shell">
@@ -96,11 +97,11 @@
 
         <section class="timestamp-panel">
           <div class="timestamp-head">
-            <div><div class="eyebrow">COMMENT TIMESTAMPS</div><h3>タイムスタンプ</h3></div>
+            <div><div class="eyebrow">TIMESTAMPS</div><h3>タイムスタンプ <span class="timestamp-count" id="timestampCount">0</span></h3></div>
             <div class="timestamp-tools"><button class="ghost-btn" id="timestampImportBtn" disabled>コメントから取込</button></div>
           </div>
           <div id="timestampView" class="timestamp-view empty">
-            <div class="empty-copy"><strong>タイムスタンプなし</strong><span>YouTubeコメント欄のタイムスタンプを丸ごと貼り付けて登録できます。</span></div>
+            <div class="empty-copy"><strong>タイムスタンプなし</strong><span>コメント欄のタイムスタンプを貼り付けて登録できます。</span></div>
           </div>
         </section>
       </div>
@@ -110,8 +111,11 @@
   <dialog id="videoDialog" class="dialog">
     <form method="dialog" id="videoForm">
       <div class="dialog-head"><div><div class="eyebrow">ASMR ITEM</div><h3 id="videoDialogTitle">ASMRを追加</h3></div><button value="cancel" class="icon-btn subtle">×</button></div>
-      <label>YouTube URL<input id="videoUrl" required placeholder="https://www.youtube.com/watch?v=..."></label>
-      <div class="two-col"><label>タイトル<input id="videoTitle" required placeholder="ASMRタイトル"></label><label>配信者<input id="creator" placeholder="チャンネル / 配信者"></label></div>
+      <label>YouTube URL
+        <div class="metadata-url-row"><input id="videoUrl" required placeholder="https://www.youtube.com/watch?v=..."><button type="button" class="ghost-btn" id="metadataRefreshBtn">情報取得</button></div>
+        <span id="metadataStatus" class="field-hint">URLを貼るとタイトルとチャンネル名を自動取得します。</span>
+      </label>
+      <div class="two-col"><label>タイトル<input id="videoTitle" placeholder="URLから自動取得"></label><label>配信者<input id="creator" placeholder="URLから自動取得"></label></div>
       <label>タグ<input id="tags" placeholder="耳かき, 囁き, 睡眠, 両耳"></label>
       <div class="two-col"><label>評価<select id="rating"><option value="0">未評価</option><option value="1">普通</option><option value="2">好き</option><option value="3">かなり好き</option><option value="4">神</option></select></label><label>作品音量<input id="itemVolume" type="number" min="0" max="100" value="35"></label></div>
       <label class="check-row"><input id="sleepFriendly" type="checkbox">睡眠向けとして登録</label>
@@ -123,7 +127,7 @@
   <dialog id="timestampDialog" class="dialog timestamp-dialog">
     <form method="dialog" id="timestampForm">
       <div class="dialog-head"><div><div class="eyebrow">YOUTUBE COMMENT</div><h3>コメントからタイムスタンプ取込</h3><p class="muted small">コメント全体を貼っても、時刻がある行だけ抽出します。</p></div><button value="cancel" class="icon-btn subtle">×</button></div>
-      <textarea id="timestampPaste" rows="10" placeholder="タイムスタンプです！&#10;0:00 開始&#10;3:24 右耳かき&#10;10:51 囁き"></textarea>
+      <textarea id="timestampPaste" rows="8" placeholder="タイムスタンプです！&#10;0:00 開始&#10;3:24 右耳かき&#10;10:51 囁き"></textarea>
       <div class="parse-row"><button type="button" id="parseTimestampsBtn" class="primary-soft">タイムスタンプを解析</button><span id="parseSummary" class="muted small"></span></div>
       <div id="timestampPreview" class="timestamp-preview"></div>
       <div class="dialog-actions"><button value="cancel" class="ghost-btn">キャンセル</button><button id="saveTimestampsBtn" type="button" class="primary-btn" disabled>すべて追加</button></div>
@@ -147,6 +151,6 @@
 
   <div id="toast" class="toast"></div>
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
