@@ -92,11 +92,16 @@
   window.guessTags=function(label,group=''){return timestampTags(String(label||''),String(group||''))};
 })();
 
-// Loaded after app.js so it can replace the legacy timestamp renderer without changing saved v1 data.
-(function loadGroupedTimestampUi(){
-  if(document.querySelector('script[data-asmr-timestamp-ui]'))return;
-  const script=document.createElement('script');
-  script.src='timestamp-ui.js?v=1.4';
-  script.dataset.asmrTimestampUi='1';
-  document.head.appendChild(script);
+(function loadAsmrtubeEnhancements(){
+  const scripts=[
+    ['timestamp-ui.js?v=1.4','asmrTimestampUi'],
+    ['ui-enhancements.js?v=1.4','asmrProductUi']
+  ];
+  for(const [src,key] of scripts){
+    if(document.querySelector(`script[data-${key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())}]`))continue;
+    const script=document.createElement('script');
+    script.src=src;
+    script.dataset[key]='1';
+    document.head.appendChild(script);
+  }
 })();
