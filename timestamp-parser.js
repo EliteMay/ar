@@ -55,7 +55,6 @@
         const candidate=cleanHeading(line);
         if(!candidate)continue;
 
-        // A short non-timestamp line immediately before a timestamp is treated as a section heading.
         let nextMeaningful='';
         for(let j=i+1;j<lines.length;j++){
           if(lines[j]){nextMeaningful=lines[j];break}
@@ -69,7 +68,6 @@
 
       let label=parsed.label.replace(/^[-–—｜|:：]+\s*/,'').trim();
 
-      // Some clipboard formats split "4:46 右" into two lines: "4:46" then "右".
       if(!label){
         let nextIndex=-1;
         for(let j=i+1;j<lines.length;j++){
@@ -92,4 +90,13 @@
   };
 
   window.guessTags=function(label,group=''){return timestampTags(String(label||''),String(group||''))};
+})();
+
+// Loaded after app.js so it can replace the legacy timestamp renderer without changing saved v1 data.
+(function loadGroupedTimestampUi(){
+  if(document.querySelector('script[data-asmr-timestamp-ui]'))return;
+  const script=document.createElement('script');
+  script.src='timestamp-ui.js?v=1.4';
+  script.dataset.asmrTimestampUi='1';
+  document.head.appendChild(script);
 })();
