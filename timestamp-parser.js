@@ -1,4 +1,4 @@
-// ASMRTube timestamp parser v1.6
+// ASMRTube timestamp parser v1.7
 // Parses collapsed YouTube comments and only creates groups when the following timestamp is a child entry.
 (function(){
   function cleanText(value){
@@ -71,7 +71,6 @@
     const tokens=findTimestampTokens(source);
     if(!tokens.length)return [];
 
-    // First pass: determine each timestamp's own label and the possible heading after it.
     const entries=tokens.map((token,i)=>{
       const next=tokens[i+1];
       const segment=source.slice(token.end,next?next.start:source.length);
@@ -102,8 +101,6 @@
       const nextEntry=entries[i+1];
       const nextIsChild=!!nextEntry&&isChildLabel(nextEntry.label);
 
-      // A trailing phrase becomes a heading only when the NEXT timestamp is a child row.
-      // Example: "7:13 喋りながらの移動  綿棒 [10:48] 右" -> 綿棒 group.
       if(entry.candidate&&nextIsChild){
         activeGroup=entry.candidate;
       }else if(rowGroup&&nextIsChild){
@@ -123,7 +120,7 @@
 
 (function loadAsmrtubeEnhancements(){
   const scripts=[
-    ['timestamp-ui.js?v=1.6','asmrTimestampUi'],
+    ['timestamp-ui.js?v=1.7','asmrTimestampUi'],
     ['ui-enhancements.js?v=1.5','asmrProductUi']
   ];
   for(const [src,key] of scripts){
