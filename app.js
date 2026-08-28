@@ -3,11 +3,14 @@ const DEFAULT_TAGS=['耳かき','梵天','囁き','吐息','オノマトペ','�
 const EAR_TAGS=['右耳','左耳','両耳','交互'];
 const state={library:[],playlists:[],recent:[],selectedId:null,currentView:'all',currentPlaylist:null,query:'',filters:new Set(),player:null,currentId:null,duration:0,loopA:null,loopB:null,sleepTimer:null,parsedTimestamps:[]};
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
+let metadataSeq=0;
+let metadataTimer=null;
 
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify({library:state.library,playlists:state.playlists,recent:state.recent}))}
 function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');state.library=Array.isArray(d.library)?d.library:[];state.playlists=Array.isArray(d.playlists)?d.playlists:[];state.recent=Array.isArray(d.recent)?d.recent:[]}catch{toast('保存データを読み込めませんでした')}}
 function uid(){return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)}
-function ytId(url){try{const u=new URL(url.trim());if(u.hostname.includes('youtu.be'))return u.pathname.slice(1).split('/')[0];if(u.hostname.includes('youtube.com')){if(u.pathname.startsWith('/shorts/'))return u.pathname.split('/')[2];return u.searchParams.get('v')}}catch{}const m=String(url).match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/);return m?.[1]||null}
+function ytId(url){try{const u=new URL(url.trim());if(u.hostname.includes('youtu.be'))return u.pathname.slice(1).split('/')[0];if(u.hostname.includes('youtube.com')){if(u.pathname.startsWith('/shorts/'))return u.pathname.split('/')[2];if(u.pathname.startsWith('/live/'))return u.pathname.split('/')[2];return u.searchParams.get('v')}}catch{}const m=String(url).match(/(?:v=|youtu\.be\/|shorts\/|live\/)([\w-]{11})/);return m?.[1]||null}
+function canonicalYoutubeUrl(videoId){return `https://www.youtube.com/watch?v=${videoId}`}
 function thumb(id){return id?`https://i.ytimg.com/vi/${id}/hqdefault.jpg`:''}
 function fmt(sec){sec=Math.max(0,Math.floor(Number(sec)||0));const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`}
 function parseTime(t){const p=String(t).trim().split(':').map(Number);if(p.some(Number.isNaN))return null;if(p.length===2)return p[0]*60+p[1];if(p.length===3)return p[0]*3600+p[1]*60+p[2];return null}
@@ -18,6 +21,48 @@ function ratingLabel(n){return ['未評価','普通','好き','かなり好き',
 function tagList(v){return String(v||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i)}
 function itemById(id){return state.library.find(x=>x.id===id)}
 function allTags(){return [...new Set([...DEFAULT_TAGS,...EAR_TAGS,...state.library.flatMap(x=>x.tags||[])])].sort((a,b)=>a.localeCompare(b,'ja'))}
+
+function setMetadataStatus(message,type=''){
+  const el=$('#metadataStatus');if(!el)return;
+  el.textContent=message;
+  el.className=`field-hint${type?` ${type}`:''}`;
+}
+async function fetchYoutubeMetadata(url,{silent=false}={}){
+  const videoId=ytId(url);
+  if(!videoId){setMetadataStatus('有効なYouTube URLを貼り付けてください。','error');return false}
+  const seq=++metadataSeq;
+  const canonical=canonicalYoutubeUrl(videoId);
+  setMetadataStatus('タイトルとチャンネル名を取得中…','loading');
+  const endpoints=[
+    `https://www.youtube.com/oembed?url=${encodeURIComponent(canonical)}&format=json`,
+    `https://noembed.com/embed?url=${encodeURIComponent(canonical)}`
+  ];
+  for(const endpoint of endpoints){
+    try{
+      const res=await fetch(endpoint,{mode:'cors',cache:'no-store'});
+      if(!res.ok)continue;
+      const data=await res.json();
+      if(seq!==metadataSeq)return false;
+      if(data.title)$('#videoTitle').value=data.title;
+      if(data.author_name)$('#creator').value=data.author_name;
+      if(data.title||data.author_name){
+        setMetadataStatus('タイトルとチャンネル名を自動取得しました。','success');
+        return true;
+      }
+    }catch{}
+  }
+  if(seq!==metadataSeq)return false;
+  setMetadataStatus('自動取得できませんでした。タイトル・配信者は手入力できます。','error');
+  if(!silent)toast('動画情報を自動取得できませんでした');
+  return false;
+}
+function queueMetadataFetch(){
+  clearTimeout(metadataTimer);
+  const url=$('#videoUrl').value.trim();
+  if(!url){setMetadataStatus('URLを貼るとタイトルとチャンネル名を自動取得します。');return}
+  if(!ytId(url)){setMetadataStatus('YouTube URLを認識できません。','error');return}
+  metadataTimer=setTimeout(()=>fetchYoutubeMetadata(url,{silent:true}),400);
+}
 
 function filtered(){
   let a=[...state.library];
@@ -116,26 +161,41 @@ function renderSelection(){
 function renderTimestamps(){
   const x=itemById(state.selectedId),view=$('#timestampView');
   const rows=x?.timestamps||[];
-  if(!x||!rows.length){view.className='timestamp-view empty';view.innerHTML='<div class="empty-copy"><strong>タイムスタンプなし</strong><span>YouTubeコメント欄のタイムスタンプを丸ごと貼り付けて登録できます。</span></div>';return}
+  $('#timestampCount').textContent=rows.length;
+  if(!x||!rows.length){view.className='timestamp-view empty';view.innerHTML='<div class="empty-copy"><strong>タイムスタンプなし</strong><span>コメント欄のタイムスタンプを貼り付けて登録できます。</span></div>';return}
   rows.sort((a,b)=>a.time-b.time);
   view.className='timestamp-view';
-  view.innerHTML=rows.map((t,i)=>`<div class="timestamp-row"><button class="timestamp-time" data-time="${t.time}">${fmt(t.time)}</button><div class="timestamp-copy"><strong>${esc(t.label)}</strong><div class="tag-row">${(t.tags||[]).map(z=>`<span class="tag">${esc(z)}</span>`).join('')}</div><div class="timestamp-index">#${i+1}</div></div><button class="timestamp-delete" data-index="${i}" title="削除">×</button></div>`).join('');
-  $$('.timestamp-time').forEach(b=>b.onclick=()=>playItem(x.id,Number(b.dataset.time)));
+  view.innerHTML=rows.map((t,i)=>`<div class="timestamp-row" data-time="${t.time}"><button class="timestamp-time timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${fmt(t.time)}</button><button class="timestamp-label timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${esc(t.label)}</button><button class="timestamp-delete" data-index="${i}" title="削除">×</button></div>`).join('');
+  $$('.timestamp-jump').forEach(b=>b.onclick=()=>playItem(x.id,Number(b.dataset.time)));
   $$('.timestamp-delete').forEach(b=>b.onclick=()=>{x.timestamps.splice(Number(b.dataset.index),1);save();renderTimestamps();toast('タイムスタンプを削除しました')});
+  updateActiveTimestamp(state.player?.getCurrentTime?.()||0);
+}
+function updateActiveTimestamp(currentTime){
+  const rows=$$('.timestamp-row');
+  if(!rows.length||state.currentId!==state.selectedId){rows.forEach(r=>r.classList.remove('active'));return}
+  let active=-1;
+  rows.forEach((r,i)=>{if(Number(r.dataset.time)<=currentTime)active=i});
+  rows.forEach((r,i)=>r.classList.toggle('active',i===active));
 }
 
 function renderAll(){renderPlaylists();renderFilters();renderSongList();renderSelection()}
 
 function openVideoDialog(x=null){
+  metadataSeq++;
+  clearTimeout(metadataTimer);
   $('#videoDialogTitle').textContent=x?'ASMRを編集':'ASMRを追加';
   $('#editId').value=x?.id||'';$('#videoUrl').value=x?.url||'';$('#videoTitle').value=x?.title||'';$('#creator').value=x?.creator||'';$('#tags').value=(x?.tags||[]).join(', ');$('#rating').value=String(x?.rating||0);$('#itemVolume').value=String(x?.volume??35);$('#sleepFriendly').checked=!!x?.sleepFriendly;
+  setMetadataStatus(x?'URLを変更するとタイトルとチャンネル名を再取得します。':'URLを貼るとタイトルとチャンネル名を自動取得します。');
   $('#videoDialog').showModal();
 }
-function saveVideo(e){
+async function saveVideo(e){
   e.preventDefault();
   const url=$('#videoUrl').value.trim(),videoId=ytId(url);if(!videoId)return toast('有効なYouTube URLを入力してください');
   const editId=$('#editId').value,dup=state.library.find(x=>x.videoId===videoId&&x.id!==editId);if(dup)return toast(`「${dup.title}」として登録済みです`);
-  const data={url,videoId,title:$('#videoTitle').value.trim(),creator:$('#creator').value.trim(),tags:tagList($('#tags').value),rating:Number($('#rating').value),volume:Math.min(100,Math.max(0,Number($('#itemVolume').value)||35)),sleepFriendly:$('#sleepFriendly').checked};
+  if(!$('#videoTitle').value.trim()||!$('#creator').value.trim())await fetchYoutubeMetadata(url,{silent:true});
+  const title=$('#videoTitle').value.trim();
+  if(!title)return toast('タイトルを取得できませんでした。タイトルを入力してください');
+  const data={url,videoId,title,creator:$('#creator').value.trim(),tags:tagList($('#tags').value),rating:Number($('#rating').value),volume:Math.min(100,Math.max(0,Number($('#itemVolume').value)||35)),sleepFriendly:$('#sleepFriendly').checked};
   if(editId){const x=itemById(editId);Object.assign(x,data,{updatedAt:Date.now()});state.selectedId=x.id}
   else{const x={id:uid(),favorite:false,timestamps:[],createdAt:Date.now(),...data};state.library.push(x);state.selectedId=x.id}
   save();$('#videoDialog').close();renderAll();selectItem(state.selectedId);toast('保存しました');
@@ -186,6 +246,7 @@ function updatePlayerUi(){
   if(!state.player?.getCurrentTime)return;
   const t=state.player.getCurrentTime()||0,d=state.player.getDuration()||0;state.duration=d;$('#timeNow').textContent=fmt(t);$('#timeTotal').textContent=fmt(d);if(d)$('#seek').value=Math.round(t/d*1000);
   if(state.loopA!=null&&state.loopB!=null&&t>=state.loopB)state.player.seekTo(state.loopA,true);
+  updateActiveTimestamp(t);
 }
 function resetLoop(){state.loopA=null;state.loopB=null;$('#loopBtn').textContent='A-B';$('#loopBtn').classList.remove('active');$('#loopStatus').textContent='区間リピート: OFF';$('#loopStatus').classList.remove('active')}
 
@@ -203,6 +264,8 @@ window.onYouTubeIframeAPIReady=()=>{
 };
 
 $('#addVideoBtn').onclick=()=>openVideoDialog();$('#topAddBtn').onclick=()=>openVideoDialog();$('#emptyAddBtn').onclick=()=>openVideoDialog();$('#videoForm').onsubmit=saveVideo;
+$('#videoUrl').addEventListener('input',queueMetadataFetch);$('#videoUrl').addEventListener('paste',()=>setTimeout(queueMetadataFetch,0));
+$('#metadataRefreshBtn').onclick=()=>fetchYoutubeMetadata($('#videoUrl').value.trim());
 $('#topFavBtn').onclick=toggleFavorite;$('#topEditBtn').onclick=()=>{const x=itemById(state.selectedId);if(x)openVideoDialog(x)};
 $('#filterBtn').onclick=()=>$('#filters').classList.toggle('hidden');$('#clearFiltersBtn').onclick=()=>{state.filters.clear();renderFilters();renderSongList()};
 $('#searchInput').oninput=e=>{state.query=e.target.value.trim();renderSongList()};$('#sortSelect').onchange=renderSongList;
