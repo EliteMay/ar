@@ -121,7 +121,7 @@
 (function loadAsmrtubeEnhancements(){
   const scripts=[
     ['timestamp-ui.js?v=1.7','asmrTimestampUi'],
-    ['ui-enhancements.js?v=1.5','asmrProductUi']
+    ['ui-enhancements.js?v=1.7','asmrProductUi']
   ];
   for(const [src,key] of scripts){
     if(document.querySelector(`script[data-${key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())}]`))continue;
