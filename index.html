@@ -126,8 +126,8 @@
 
   <dialog id="timestampDialog" class="dialog timestamp-dialog">
     <form method="dialog" id="timestampForm">
-      <div class="dialog-head"><div><div class="eyebrow">YOUTUBE COMMENT</div><h3>コメントからタイムスタンプ取込</h3><p class="muted small">コメント全体を貼っても、時刻がある行だけ抽出します。</p></div><button value="cancel" class="icon-btn subtle">×</button></div>
-      <textarea id="timestampPaste" rows="8" placeholder="タイムスタンプです！&#10;0:00 開始&#10;3:24 右耳かき&#10;10:51 囁き"></textarea>
+      <div class="dialog-head"><div><div class="eyebrow">YOUTUBE COMMENT</div><h3>コメントからタイムスタンプ取込</h3><p class="muted small">時刻行だけでなく、直前の短い見出しも引き継ぎます。「耳ふー」→「4:46 右」なら「耳ふー 右」として登録します。</p></div><button value="cancel" class="icon-btn subtle">×</button></div>
+      <textarea id="timestampPaste" rows="8" placeholder="耳ふー&#10;4:46 右&#10;5:38 左&#10;&#10;耳かき&#10;8:20 右&#10;10:15 左"></textarea>
       <div class="parse-row"><button type="button" id="parseTimestampsBtn" class="primary-soft">タイムスタンプを解析</button><span id="parseSummary" class="muted small"></span></div>
       <div id="timestampPreview" class="timestamp-preview"></div>
       <div class="dialog-actions"><button value="cancel" class="ghost-btn">キャンセル</button><button id="saveTimestampsBtn" type="button" class="primary-btn" disabled>すべて追加</button></div>
@@ -152,5 +152,6 @@
   <div id="toast" class="toast"></div>
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="app.js?v=3"></script>
+  <script src="timestamp-parser.js?v=1"></script>
 </body>
 </html>
