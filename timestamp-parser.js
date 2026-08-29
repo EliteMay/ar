@@ -270,7 +270,7 @@
   if(window.__ASMRTUBE_PARSER_ONLY__)return;
   const scripts=[
     ['timestamp-ui.js?v=1.9','asmrTimestampUi'],
-    ['ui-enhancements.js?v=1.9','asmrProductUi']
+    ['ui-enhancements.js?v=2.0','asmrProductUi']
   ];
   for(const [src,key] of scripts){
     if(document.querySelector(`script[data-${key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())}]`))continue;
