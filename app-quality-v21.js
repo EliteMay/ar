@@ -103,13 +103,13 @@
     renderSongList();renderSelection();
   };
 
-  function flushPendingPlayerAction(){
+  const readinessTimer=setInterval(()=>{
     const ready=isPlayerReady();
     if(ready&&!playerReady)playerReady=true;
     if(ready&&pendingPlayerAction)applyPlayerAction(pendingPlayerAction);
-  }
-  const readinessTimer=setInterval(flushPendingPlayerAction,200);
-  setTimeout(()=>clearInterval(readinessTimer),30000);
+    if(ready)clearInterval(readinessTimer);
+  },200);
+  setTimeout(()=>clearInterval(readinessTimer),120000);
 
   // A cued item must still become "recent" when the user actually starts it.
   const playButton=$q('#playBtn');
@@ -143,7 +143,7 @@
     const recentIndex=state.recent.indexOf(id);
     const wasSelected=state.selectedId===id;
     const wasCurrent=state.currentId===id;
-    const removed=structuredClone?structuredClone(item):JSON.parse(JSON.stringify(item));
+    const removed=typeof structuredClone==='function'?structuredClone(item):JSON.parse(JSON.stringify(item));
 
     state.library=state.library.filter(v=>v.id!==id);
     state.playlists.forEach(p=>p.items=p.items.filter(v=>v!==id));
@@ -189,9 +189,11 @@
       const title=String(raw.title||'').trim();
       if(!videoId||!title){invalid++;continue}
       if(seenVideos.has(videoId)){duplicates++;continue}
-      let id=String(raw.id||'').trim()||uid();
+      const sourceId=String(raw.id||'').trim();
+      let id=sourceId||uid();
       if(seenIds.has(id))id=uid();
-      seenIds.add(id);seenVideos.add(videoId);idMap.set(String(raw.id||id),id);
+      seenIds.add(id);seenVideos.add(videoId);
+      if(sourceId&&!idMap.has(sourceId))idMap.set(sourceId,id);
       library.push({...raw,id,videoId,title,creator:String(raw.creator||''),tags:Array.isArray(raw.tags)?raw.tags.map(String).map(x=>x.trim()).filter(Boolean):[],timestamps:Array.isArray(raw.timestamps)?raw.timestamps.map(sanitizeTimestamp).filter(Boolean):[],favorite:!!raw.favorite,sleepFriendly:!!raw.sleepFriendly});
     }
     const validIds=new Set(library.map(x=>x.id));
@@ -289,10 +291,11 @@
   $q('#volume')?.setAttribute('aria-label','音量');
 
   const enhancementTimer=setInterval(()=>{
-    installDiagnostics();installHelpShortcuts();
+    const diagnosticsReady=!!$q('#qualityDiagnostics')||installDiagnostics();
+    const helpReady=!!$q('#helpDialog .product-shortcut-grid[data-v21]')||installHelpShortcuts();
     const badge=$q('.sidebar-version strong');if(badge)badge.textContent='v2.1';
     if(document.title.includes('ASMRTube'))document.title='ASMRTube v2.1';
-    if(installDiagnostics()&&installHelpShortcuts())clearInterval(enhancementTimer);
+    if(diagnosticsReady&&helpReady&&badge)clearInterval(enhancementTimer);
   },250);
   setTimeout(()=>clearInterval(enhancementTimer),10000);
 })();
