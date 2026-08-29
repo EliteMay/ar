@@ -57,8 +57,6 @@ resumeUpdatedAt
 
 A-B区間や好きな場面を名前付きで保存できます。
 
-例:
-
 ```text
 一番好きな耳ふー
 12:34 〜 14:20
@@ -68,13 +66,7 @@ A-B区間や好きな場面を名前付きで保存できます。
 
 ```text
 favoriteSections: [
-  {
-    id,
-    label,
-    start,
-    end,
-    createdAt
-  }
+  { id, label, start, end, createdAt }
 ]
 ```
 
@@ -83,12 +75,11 @@ favoriteSections: [
 - 保存済み区間を押すと、その範囲をA-Bリピートで再生
 - 区間名も左検索欄の検索対象
 - 作品ごとに複数保存可能
+- 動画切替時は前動画のA-Bを解除
 
 ## 配信者ページ
 
 作品情報の `配信者ページ` または上部の配信者名から開けます。
-
-表示内容:
 
 - 同じ配信者の登録作品
 - 作品数
@@ -97,7 +88,7 @@ favoriteSections: [
 - 総タイムスタンプ数
 - よく使うタグ
 - 各作品の評価
-- 続き位置がある作品はその時刻
+- 続き位置
 
 作品カードを押すとそのASMRへ移動します。
 
@@ -116,10 +107,11 @@ favoriteSections: [
 
 - `＋ 現在位置`
 - `＋ 空の行`
+- 行削除
 
-親子データがある場合は、親タイムスタンプの時刻・名前を変更しても子の `parentTime / parentLabel` を可能な範囲で追従させます。
+親タイムスタンプの時刻・名前変更時は、子の `parentTime / parentLabel` を可能な範囲で追従します。
 
-親を削除した結果、参照先を失った子は通常タイムスタンプへ戻します。
+親を削除して参照先を失った子は通常タイムスタンプへ戻します。
 
 # v2.1 品質・安全性
 
@@ -311,14 +303,33 @@ sourceStyle
 ```text
 tests/
 ├ timestamp-cases.json
-└ timestamp-parser.test.html
+├ timestamp-parser.test.html
+└ static-check.mjs
 ```
 
-GitHub Pages:
+タイムスタンプ回帰テスト:
 
 ```text
 https://elitemay.github.io/asmrtube/tests/timestamp-parser.test.html
 ```
+
+# 自動品質チェック
+
+GitHub Actionsでmainへのpush / PRごとに自動チェックします。
+
+```text
+.github/workflows/quality-check.yml
+```
+
+確認内容:
+
+- 全 `.js / .mjs` を `node --check`
+- JSONファイルをすべて構文解析
+- `index.html` のローカルCSS / JS参照先が存在するか
+- 主要ファイルが不足していないか
+- `index.html` がv2.2 CSS / JSを読み込んでいるか
+
+これにより、今後の変更でJavaScript構文エラーやファイル参照漏れをmainへ残しにくくします。
 
 # 設定
 
@@ -372,6 +383,9 @@ Esc         スマホサイドバーを閉じる
 # ファイル構成
 
 ```text
+├ .github/
+│  └ workflows/
+│     └ quality-check.yml
 ├ index.html
 ├ favicon.svg
 ├ styles.css
@@ -394,7 +408,8 @@ Esc         スマホサイドバーを閉じる
 │  └ tags.json
 └ tests/
    ├ timestamp-cases.json
-   └ timestamp-parser.test.html
+   ├ timestamp-parser.test.html
+   └ static-check.mjs
 ```
 
 役割:
@@ -406,7 +421,7 @@ Esc         スマホサイドバーを閉じる
 - `ui-enhancements.js` — v2.0 Product Shell
 - `app-quality-v21.js` — v2.1安定化・安全性
 - `library-tools-v22.js` — v2.2ライブラリ機能
-- `library-tools-v22.css` — v2.2専用UI
+- `tests/static-check.mjs` — 静的整合性確認
 
 # GitHub Pages
 
