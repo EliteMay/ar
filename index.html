@@ -126,7 +126,7 @@
 
   <dialog id="timestampDialog" class="dialog timestamp-dialog">
     <form method="dialog" id="timestampForm">
-      <div class="dialog-head"><div><div class="eyebrow">YOUTUBE COMMENT</div><h3>コメントからタイムスタンプ取込</h3><p class="muted small">改行が潰れたYouTubeコメントも解析します。見出しは、その次が「右 / 左」などの子タイムスタンプの時だけグループ化します。</p></div><button value="cancel" class="icon-btn subtle">×</button></div>
+      <div class="dialog-head"><div><div class="eyebrow">YOUTUBE COMMENT</div><h3>コメントからタイムスタンプ取込</h3><p class="muted small">普通の時刻、Markdownリンク、ハイフン区切り、見出し＋左右、▷親 / ┗子、1行に潰れたコメント、YouTube絵文字混在などを自動判定します。</p></div><button value="cancel" class="icon-btn subtle">×</button></div>
       <textarea id="timestampPaste" rows="8" placeholder="YouTubeコメントをそのまま貼り付け"></textarea>
       <div class="parse-row"><button type="button" id="parseTimestampsBtn" class="primary-soft">タイムスタンプを解析</button><span id="parseSummary" class="muted small"></span></div>
       <div id="timestampPreview" class="timestamp-preview"></div>
@@ -152,6 +152,6 @@
   <div id="toast" class="toast"></div>
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="app.js?v=3"></script>
-  <script src="timestamp-parser.js?v=1.8"></script>
+  <script src="timestamp-parser.js?v=1.9"></script>
 </body>
 </html>
