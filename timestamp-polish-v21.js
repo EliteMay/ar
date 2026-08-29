@@ -47,6 +47,12 @@
       return `<button type="button" class="role-parent-card" data-parent-time="${Number(parent.time)||0}"><span class="role-parent-name">${escText(parent.label||'親')}</span><span class="role-parent-time">${typeof fmt==='function'?fmt(parent.time):parent.time}</span><small>${count?`${count}子項目`:'親タイムスタンプ'}</small></button>`;
     }).join('')}</div>`;
     overview.prepend(box);
+    const copy=overview.querySelector('.empty-copy');
+    if(copy){
+      const strong=copy.querySelector('strong'),span=copy.querySelector('span');
+      if(strong)strong.textContent='大見出しはありません';
+      if(span)span.textContent='親タイムスタンプから直接ジャンプできます。全件を時系列で見る場合は「すべて」を使ってください。';
+    }
     box.querySelectorAll('[data-parent-time]').forEach(button=>button.addEventListener('click',()=>{
       const item=currentItem();if(!item)return;
       playItem(item.id,Number(button.dataset.parentTime)||0);
