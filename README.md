@@ -78,6 +78,7 @@ ASMRを削除すると8秒間 `元に戻す` を表示します。
 復元対象:
 
 - ASMR本体
+- 元のライブラリ位置
 - プレイリスト内の位置
 - 最近聴いた内の位置
 
@@ -117,6 +118,19 @@ v2.0の削除前スナップショットも引き続き併用します。
 - 最近聴いたの壊れた参照
 
 診断は確認のみで、勝手にデータを書き換えません。
+
+## 親子タイムスタンプ表示
+
+v1.9で保存している `role / parentTime / parentLabel / subtitle` を表示側でも利用します。
+
+- `role=parent` は `親` バッジ付きで強調
+- `role=child` は `↳` と左ガイドで一段下げて表示
+- `subtitle` は本文の下へ小さい副題として表示
+- 大見出し `group` がなくても親タイムスタンプがある場合、`見出し` モード上部へ親カード一覧を表示
+- 親カードを押すとその親の時刻から再生
+- 親ごとの子項目数を表示
+
+これにより `▷親 / ┗子` や途中に `└子` が出る形式でも、解析だけでなく表示上でも関係が分かりやすくなります。
 
 ## 再生ショートカット
 
@@ -197,6 +211,7 @@ v2.0では、自分の他プロジェクトで既に改善してきた設計をA
 - タイムスタンプ
 - `見出し / すべて`
 - 親見出しジャンプ
+- 親タイムスタンプジャンプ
 - グループ折りたたみ
 - 現在位置ハイライト
 
@@ -340,22 +355,6 @@ confidence
 sourceStyle
 ```
 
-# タイムスタンプ表示
-
-## 見出しモード
-
-- 親見出しをコンパクトカードで一覧化
-- 親を押すと先頭へシーク
-- 選んだ親の子タイムスタンプを表示
-- 再生中の親へ自動追従
-- 親なしは `その他のタイムスタンプ`
-
-## すべてモード
-
-- 全タイムスタンプを時系列表示
-- 親グループを折りたたみ
-- 再生中グループを自動展開・強調
-
 # 回帰テスト
 
 ```text
@@ -403,6 +402,7 @@ https://elitemay.github.io/asmrtube/tests/timestamp-parser.test.html
 ├ app-quality-v21.js
 ├ timestamp-parser.js
 ├ timestamp-ui.js
+├ timestamp-polish-v21.js
 ├ ui-enhancements.js
 ├ README.md
 ├ 作業報告書.md
@@ -420,13 +420,14 @@ CSS:
 - `asmr-overrides.css` — ASMR / タイムスタンプ固有調整
 - `ui-base-v2.css` — Product Shell共通UI
 - `product-v2.css` — Dashboard / 設定 / データ管理 / スマホドロワー
-- `quality-v21.css` — 0件状態 / Undo / 診断 / v2.1品質UI
+- `quality-v21.css` — 0件状態 / Undo / 診断 / 親子タイムスタンプ / v2.1品質UI
 
 JavaScript:
 
 - `app.js` — ASMRTube基本機能
 - `timestamp-parser.js` — 汎用タイムスタンプ解析
-- `timestamp-ui.js` — タイムスタンプ表示
+- `timestamp-ui.js` — タイムスタンプ基本表示
+- `timestamp-polish-v21.js` — 親子role / subtitleを使ったv2.1表示補強
 - `ui-enhancements.js` — v2.0 Product Shell
 - `app-quality-v21.js` — v2.1検索 / 再生安定化 / Undo / 安全な読み込み / 診断
 
@@ -449,6 +450,7 @@ https://elitemay.github.io/asmrtube/
 
 - v2.1をGitHub Pages上で実ブラウザから全操作した最終確認
 - YouTube APIが非常に遅い環境での2分超の準備待ち
-- iPhone / Android実機でのv2.1 Undo / キーボード以外の操作
+- iPhone / Android実機でのv2.1 Undo / 親タイムスタンプカード操作
+- 大規模ライブラリでタイムスタンプ全文検索した時の体感性能
 - 長時間連続再生
 - YouTube埋め込み制限動画の詳細エラー表示
