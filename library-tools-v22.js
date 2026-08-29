@@ -11,13 +11,13 @@
   const fmtTime=value=>typeof fmt==='function'?fmt(value):String(value??0);
   let lastResumeSaveAt=0;
   let editorRows=[];
+  let lastSelectedId=state.selectedId;
 
   function currentPosition(){try{return Number(state.player?.getCurrentTime?.()||0)}catch{return 0}}
   function currentDuration(){try{return Number(state.player?.getDuration?.()||0)}catch{return 0}}
   function parseEditorTime(value){
     if(typeof parseTime==='function'){
-      const n=parseTime(String(value||'').trim());
-      if(n!=null)return n;
+      const n=parseTime(String(value||'').trim());if(n!=null)return n;
     }
     const p=String(value||'').trim().split(':').map(Number);
     if(p.some(Number.isNaN))return null;
@@ -46,8 +46,7 @@
   // Resume playback
   // ------------------------------------------------------------------------
   function updateResumeCard(item){
-    const card=$('#infoCard .resume-card');
-    if(!card)return;
+    const card=$('#infoCard .resume-card');if(!card)return;
     const resume=Number(item?.resumeAt||0),duration=Number(item?.resumeDuration||0);
     if(resume<=8){card.remove();return}
     const strong=$('strong',card);if(strong)strong.textContent=`${fmtTime(resume)}${duration?` / ${fmtTime(duration)}`:''}`;
@@ -56,15 +55,19 @@
   function persistResume(force=false){
     const id=state.currentId;if(!id||!state.player)return;
     const item=typeof itemById==='function'?itemById(id):null;if(!item)return;
+    let playerState=null;try{playerState=Number(state.player.getPlayerState?.())}catch{}
+    // 5=CUED / -1=UNSTARTED should never overwrite a previously saved resume point.
+    if(![0,1,2].includes(playerState))return;
     const now=Date.now();if(!force&&now-lastResumeSaveAt<5000)return;
     const time=currentPosition(),duration=currentDuration();
     if(!Number.isFinite(time)||time<0||!Number.isFinite(duration)||duration<=0)return;
     lastResumeSaveAt=now;
 
-    if(time<8||duration-time<15||time/duration>=.975){
+    if(playerState===0||duration-time<15||time/duration>=.975){
       if(item.resumeAt!=null){delete item.resumeAt;delete item.resumeDuration;delete item.resumeUpdatedAt;save();updateResumeCard(item)}
       return;
     }
+    if(time<8)return;
     if(!force&&Math.abs(Number(item.resumeAt||0)-time)<3)return;
     item.resumeAt=Math.floor(time);item.resumeDuration=Math.floor(duration);item.resumeUpdatedAt=now;save();updateResumeCard(item);
   }
@@ -90,16 +93,12 @@
     if(loop){loop.textContent='A-B ON';loop.classList.add('active')}
     if(status){status.textContent=`${fmtTime(start)} 〜 ${fmtTime(end)}`;status.classList.add('active')}
   }
-
-  function playSection(item,section){
-    setLoopUi(section.start,section.end);playItem(item.id,section.start);toast(`「${section.label}」を区間リピートします`);
-  }
+  function playSection(item,section){setLoopUi(section.start,section.end);playItem(item.id,section.start);toast(`「${section.label}」を区間リピートします`)}
 
   function createSectionDialog(){
     if($('#favoriteSectionDialog'))return;
     const dialog=document.createElement('dialog');dialog.id='favoriteSectionDialog';dialog.className='dialog v22-dialog';
-    dialog.innerHTML=`<form method="dialog" id="favoriteSectionForm"><div class="dialog-head"><div><div class="eyebrow">FAVORITE SECTION</div><h3>お気に入り区間を保存</h3></div><button value="cancel" class="icon-btn subtle">×</button></div><div class="v22-section-form"><label>名前<input id="favoriteSectionLabel" maxlength="80" placeholder="例: 一番好きな耳ふー"></label><div class="two-col"><label>開始<input id="favoriteSectionStart" placeholder="12:34"></label><label>終了<input id="favoriteSectionEnd" placeholder="14:20"></label></div><div class="v22-dialog-hint">A-B区間が設定されていればその範囲を使います。未設定なら現在位置から30秒を仮入力します。</div></div><div class="dialog-actions"><button value="cancel" class="ghost-btn">キャンセル</button><button type="submit" class="primary-btn">保存</button></div></form>`;
-    document.body.appendChild(dialog);
+    dialog.innerHTML=`<form method="dialog" id="favoriteSectionForm"><div class="dialog-head"><div><div class="eyebrow">FAVORITE SECTION</div><h3>お気に入り区間を保存</h3></div><button value="cancel" class="icon-btn subtle">×</button></div><div class="v22-section-form"><label>名前<input id="favoriteSectionLabel" maxlength="80" placeholder="例: 一番好きな耳ふー"></label><div class="two-col"><label>開始<input id="favoriteSectionStart" placeholder="12:34"></label><label>終了<input id="favoriteSectionEnd" placeholder="14:20"></label></div><div class="v22-dialog-hint">A-B区間が設定されていればその範囲を使います。未設定なら現在位置から30秒を仮入力します。</div></div><div class="dialog-actions"><button value="cancel" class="ghost-btn">キャンセル</button><button type="submit" class="primary-btn">保存</button></div></form>`;document.body.appendChild(dialog);
     $('#favoriteSectionForm').addEventListener('submit',event=>{
       event.preventDefault();const item=getItem();if(!item)return;
       const start=parseEditorTime($('#favoriteSectionStart').value),end=parseEditorTime($('#favoriteSectionEnd').value);
@@ -122,8 +121,7 @@
   // ------------------------------------------------------------------------
   function createCreatorDialog(){
     if($('#creatorDialog'))return;
-    const dialog=document.createElement('dialog');dialog.id='creatorDialog';dialog.className='dialog v22-dialog v22-creator-dialog';
-    dialog.innerHTML=`<form method="dialog"><div class="dialog-head"><div><div class="eyebrow">CREATOR LIBRARY</div><h3 id="creatorDialogTitle">配信者</h3><p class="muted small" id="creatorDialogMeta"></p></div><button value="cancel" class="icon-btn subtle">×</button></div><div id="creatorDialogBody"></div><div class="dialog-actions"><button value="cancel" class="primary-btn">閉じる</button></div></form>`;document.body.appendChild(dialog);
+    const dialog=document.createElement('dialog');dialog.id='creatorDialog';dialog.className='dialog v22-dialog v22-creator-dialog';dialog.innerHTML=`<form method="dialog"><div class="dialog-head"><div><div class="eyebrow">CREATOR LIBRARY</div><h3 id="creatorDialogTitle">配信者</h3><p class="muted small" id="creatorDialogMeta"></p></div><button value="cancel" class="icon-btn subtle">×</button></div><div id="creatorDialogBody"></div><div class="dialog-actions"><button value="cancel" class="primary-btn">閉じる</button></div></form>`;document.body.appendChild(dialog);
   }
 
   function showCreatorPage(creator){
@@ -139,10 +137,7 @@
   // ------------------------------------------------------------------------
   // Selected item panel
   // ------------------------------------------------------------------------
-  function featureSignature(item){
-    return JSON.stringify([Number(item.resumeAt||0),Number(item.resumeDuration||0),sectionsOf(item).map(x=>[x.id,x.label,x.start,x.end])]);
-  }
-
+  function featureSignature(item){return JSON.stringify([Number(item.resumeAt||0),Number(item.resumeDuration||0),sectionsOf(item).map(x=>[x.id,x.label,x.start,x.end])])}
   function enhanceInfoCard(force=false){
     const info=$('#infoCard'),item=getItem();if(!info||!item||!info.querySelector('.info-actions'))return;
     const sig=featureSignature(item),old=info.querySelector('.v22-library-tools');if(old&&!force&&old.dataset.signature===sig)return;if(old)old.remove();
@@ -153,7 +148,6 @@
     $$('[data-section-play]',wrapper).forEach(button=>button.onclick=()=>{const section=sections.find(x=>x.id===button.dataset.sectionPlay);if(section)playSection(item,section)});
     $$('[data-section-delete]',wrapper).forEach(button=>button.onclick=()=>{const section=sections.find(x=>x.id===button.dataset.sectionDelete);if(!section||!confirm(`「${section.label}」を削除しますか？`))return;item.favoriteSections=sections.filter(x=>x.id!==section.id);save();enhanceInfoCard(true);toast('お気に入り区間を削除しました')});
   }
-
   const info=$('#infoCard');if(info)new MutationObserver(()=>queueMicrotask(()=>enhanceInfoCard(false))).observe(info,{childList:true,subtree:true});enhanceInfoCard(false);
   const nowCreator=$('#nowCreator');if(nowCreator){nowCreator.classList.add('creator-link');nowCreator.setAttribute('title','配信者ページを開く');nowCreator.addEventListener('click',()=>{const item=getItem();if(item)showCreatorPage(item.creator)})}
 
@@ -162,25 +156,21 @@
   // ------------------------------------------------------------------------
   function createTimestampEditor(){
     if($('#timestampEditDialog'))return;
-    const dialog=document.createElement('dialog');dialog.id='timestampEditDialog';dialog.className='dialog timestamp-edit-dialog';
-    dialog.innerHTML=`<form method="dialog" id="timestampEditForm"><div class="dialog-head"><div><div class="eyebrow">TIMESTAMP EDITOR</div><h3>保存済みタイムスタンプを編集</h3><p class="muted small">時間・見出し・内容・副題を直接修正できます。親子情報は可能な範囲で維持します。</p></div><button value="cancel" class="icon-btn subtle">×</button></div><div class="timestamp-edit-toolbar"><button type="button" class="ghost-btn" id="timestampAddCurrent">＋ 現在位置</button><button type="button" class="ghost-btn" id="timestampAddBlank">＋ 空の行</button><span id="timestampEditCount"></span></div><div class="timestamp-edit-head"><span>見出し</span><span>時間</span><span>内容</span><span>副題</span><span></span></div><div id="timestampEditRows" class="timestamp-edit-rows"></div><div class="dialog-actions"><button value="cancel" class="ghost-btn">キャンセル</button><button type="submit" class="primary-btn">変更を保存</button></div></form>`;document.body.appendChild(dialog);
-    $('#timestampAddCurrent').onclick=()=>addEditorRow(Math.floor(currentPosition()));$('#timestampAddBlank').onclick=()=>addEditorRow(0);$('#timestampEditForm').addEventListener('submit',saveTimestampEdits);
-    $('#timestampEditRows').addEventListener('click',event=>{const button=event.target.closest('[data-remove-edit-row]');if(!button)return;editorRows=editorRows.filter(row=>row.key!==button.dataset.removeEditRow);renderEditorRows()});
+    const dialog=document.createElement('dialog');dialog.id='timestampEditDialog';dialog.className='dialog timestamp-edit-dialog';dialog.innerHTML=`<form method="dialog" id="timestampEditForm"><div class="dialog-head"><div><div class="eyebrow">TIMESTAMP EDITOR</div><h3>保存済みタイムスタンプを編集</h3><p class="muted small">時間・見出し・内容・副題を直接修正できます。親子情報は可能な範囲で維持します。</p></div><button value="cancel" class="icon-btn subtle">×</button></div><div class="timestamp-edit-toolbar"><button type="button" class="ghost-btn" id="timestampAddCurrent">＋ 現在位置</button><button type="button" class="ghost-btn" id="timestampAddBlank">＋ 空の行</button><span id="timestampEditCount"></span></div><div class="timestamp-edit-head"><span>見出し</span><span>時間</span><span>内容</span><span>副題</span><span></span></div><div id="timestampEditRows" class="timestamp-edit-rows"></div><div class="dialog-actions"><button value="cancel" class="ghost-btn">キャンセル</button><button type="submit" class="primary-btn">変更を保存</button></div></form>`;document.body.appendChild(dialog);
+    $('#timestampAddCurrent').onclick=()=>{captureEditorInputs();addEditorRow(Math.floor(currentPosition()))};$('#timestampAddBlank').onclick=()=>{captureEditorInputs();addEditorRow(0)};$('#timestampEditForm').addEventListener('submit',saveTimestampEdits);
+    $('#timestampEditRows').addEventListener('click',event=>{const button=event.target.closest('[data-remove-edit-row]');if(!button)return;captureEditorInputs();editorRows=editorRows.filter(row=>row.key!==button.dataset.removeEditRow);renderEditorRows()});
   }
 
-  function openTimestampEditor(){
-    const item=getItem();if(!item)return;createTimestampEditor();editorRows=(item.timestamps||[]).map((row,index)=>({key:`existing-${index}-${makeId()}`,originalTime:Number(row.time),data:{...row}}));renderEditorRows();$('#timestampEditDialog').showModal();
+  function openTimestampEditor(){const item=getItem();if(!item)return;createTimestampEditor();editorRows=(item.timestamps||[]).map((row,index)=>({key:`existing-${index}-${makeId()}`,originalTime:Number(row.time),data:{...row},timeInput:null}));renderEditorRows();$('#timestampEditDialog').showModal()}
+  function captureEditorInputs(){
+    const box=$('#timestampEditRows');if(!box)return;
+    $$('.timestamp-edit-row',box).forEach(dom=>{const row=editorRows.find(x=>x.key===dom.dataset.editKey);if(!row)return;row.data.group=$('[data-field="group"]',dom).value;row.data.label=$('[data-field="label"]',dom).value;row.data.subtitle=$('[data-field="subtitle"]',dom).value;const raw=$('[data-field="time"]',dom).value,n=parseEditorTime(raw);if(n==null)row.timeInput=raw;else{row.data.time=n;row.timeInput=null}});
   }
-
-  function addEditorRow(time){
-    editorRows.push({key:`new-${makeId()}`,originalTime:null,data:{time:Number(time)||0,label:'タイムスタンプ',group:'',subtitle:'',role:'item',confidence:1,sourceStyle:'manual',tags:[]}});editorRows.sort((a,b)=>Number(a.data.time)-Number(b.data.time));renderEditorRows();requestAnimationFrame(()=>$('#timestampEditRows')?.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'}));
-  }
-
+  function addEditorRow(time){editorRows.push({key:`new-${makeId()}`,originalTime:null,timeInput:null,data:{time:Number(time)||0,label:'タイムスタンプ',group:'',subtitle:'',role:'item',confidence:1,sourceStyle:'manual',tags:[]}});editorRows.sort((a,b)=>Number(a.data.time)-Number(b.data.time));renderEditorRows();requestAnimationFrame(()=>$('#timestampEditRows')?.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'}))}
   function renderEditorRows(){
     const box=$('#timestampEditRows');if(!box)return;$('#timestampEditCount').textContent=`${editorRows.length}件`;
-    box.innerHTML=editorRows.map(row=>{const d=row.data||{};return `<div class="timestamp-edit-row" data-edit-key="${safe(row.key)}"><input data-field="group" value="${safe(d.group||'')}" placeholder="見出しなし"><input data-field="time" value="${safe(fmtTime(d.time))}" placeholder="0:00"><div class="timestamp-edit-label-wrap"><input data-field="label" value="${safe(d.label||'')}" placeholder="内容">${d.role&&d.role!=='item'?`<span class="timestamp-edit-role">${d.role==='parent'?'親':'子'}</span>`:''}</div><input data-field="subtitle" value="${safe(d.subtitle||'')}" placeholder="副題なし"><button type="button" class="timestamp-edit-remove" data-remove-edit-row="${safe(row.key)}" title="削除">×</button></div>`}).join('');
+    box.innerHTML=editorRows.map(row=>{const d=row.data||{},timeValue=row.timeInput!=null?row.timeInput:fmtTime(d.time);return `<div class="timestamp-edit-row" data-edit-key="${safe(row.key)}"><input data-field="group" value="${safe(d.group||'')}" placeholder="見出しなし"><input data-field="time" value="${safe(timeValue)}" placeholder="0:00"><div class="timestamp-edit-label-wrap"><input data-field="label" value="${safe(d.label||'')}" placeholder="内容">${d.role&&d.role!=='item'?`<span class="timestamp-edit-role">${d.role==='parent'?'親':'子'}</span>`:''}</div><input data-field="subtitle" value="${safe(d.subtitle||'')}" placeholder="副題なし"><button type="button" class="timestamp-edit-remove" data-remove-edit-row="${safe(row.key)}" title="削除">×</button></div>`}).join('');
   }
-
   function saveTimestampEdits(event){
     event.preventDefault();const item=getItem();if(!item)return;const drafts=[];let invalid=false;
     $$('.timestamp-edit-row',$('#timestampEditRows')).forEach(dom=>{const source=editorRows.find(row=>row.key===dom.dataset.editKey);if(!source)return;const time=parseEditorTime($('[data-field="time"]',dom).value);if(time==null){invalid=true;dom.classList.add('invalid');return}const group=$('[data-field="group"]',dom).value.trim(),label=$('[data-field="label"]',dom).value.trim()||'タイムスタンプ',subtitle=$('[data-field="subtitle"]',dom).value.trim(),next={...source.data,time,group,label,editedAt:Date.now()};if(subtitle)next.subtitle=subtitle;else delete next.subtitle;next.tags=typeof guessTags==='function'?guessTags(label,group,subtitle):(Array.isArray(next.tags)?next.tags:[]);drafts.push({originalTime:source.originalTime,data:next})});
@@ -190,11 +180,13 @@
     item.timestamps=drafts.map(row=>row.data).sort((a,b)=>Number(a.time)-Number(b.time));save();$('#timestampEditDialog').close();window.renderTimestamps?.();renderFilters();toast('タイムスタンプを更新しました');
   }
 
-  function installEditButton(){
-    const tools=$('.timestamp-tools');if(!tools)return false;let button=$('#timestampEditBtn');if(!button){button=document.createElement('button');button.id='timestampEditBtn';button.className='ghost-btn';button.textContent='編集';button.onclick=openTimestampEditor;tools.prepend(button)}button.disabled=!state.selectedId;return true;
+  function installEditButton(){const tools=$('.timestamp-tools');if(!tools)return false;let button=$('#timestampEditBtn');if(!button){button=document.createElement('button');button.id='timestampEditBtn';button.className='ghost-btn';button.textContent='編集';button.onclick=openTimestampEditor;tools.prepend(button)}button.disabled=!state.selectedId;return true}
+  function handleSelectionChange(){
+    if(state.selectedId!==lastSelectedId){if(lastSelectedId!=null&&typeof resetLoop==='function')resetLoop();lastSelectedId=state.selectedId}
+    installEditButton();enhanceInfoCard(false);
   }
   const tsPanel=$('.timestamp-panel');if(tsPanel)new MutationObserver(installEditButton).observe(tsPanel,{childList:true,subtree:true});installEditButton();
-  const title=$('#nowTitle');if(title)new MutationObserver(()=>{installEditButton();enhanceInfoCard(false)}).observe(title,{childList:true,subtree:true,characterData:true});
+  const title=$('#nowTitle');if(title)new MutationObserver(handleSelectionChange).observe(title,{childList:true,subtree:true,characterData:true});
 
   const versionTimer=setInterval(()=>{const badge=$('.sidebar-version strong');if(badge){badge.textContent='v2.2';clearInterval(versionTimer)}},200);setTimeout(()=>clearInterval(versionTimer),5000);document.title='ASMRTube v2.2';
   window.asmrtubeLibraryTools={persistResume,showCreatorPage,openSectionDialog,openTimestampEditor};
