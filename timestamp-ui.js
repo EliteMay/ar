@@ -1,316 +1,203 @@
-// Compact timestamp UI for ASMRTube v1.8
+// ASMRTube timestamp UI — explicit render/event integration.
 (function(){
+  'use strict';
+
   const VIEW_KEY='asmrtube.timestamp.view.v1';
   const $=s=>document.querySelector(s);
   const $$=s=>[...document.querySelectorAll(s)];
   let chapterRanges=[];
   let lastActiveChapter=-1;
   let selectedChapter=-1;
-  let viewMode=localStorage.getItem(VIEW_KEY)||'chapters';
+  let viewMode='chapters';
   const expandedChapters=new Set();
 
-  const style=document.createElement('style');
-  style.textContent=`
-    .timestamp-view-mode{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border-bottom:1px solid var(--border);background:rgba(10,11,14,.84);backdrop-filter:blur(10px)}
-    .timestamp-view-tabs{display:flex;gap:4px;padding:3px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.025)}
-    .timestamp-view-tab{border:0;border-radius:6px;background:transparent;color:#858c98;padding:5px 9px;font-size:10px;font-weight:800;cursor:pointer}
-    .timestamp-view-tab.active{background:rgba(139,92,246,.14);color:#eee9ff;box-shadow:inset 0 0 0 1px rgba(139,92,246,.12)}
-    .timestamp-view-meta{color:#737986;font-size:9px;font-weight:700}
-
-    .chapter-overview{padding:8px;display:grid;gap:8px}
-    .chapter-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-    .chapter-card{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;gap:2px 7px;text-align:left;padding:8px 9px;border:1px solid rgba(255,255,255,.075);border-radius:9px;background:rgba(255,255,255,.025);color:#c2c7d0;cursor:pointer;transition:.14s ease}
-    .chapter-card:hover{background:rgba(139,92,246,.075);border-color:rgba(139,92,246,.2);color:#eee9ff}
-    .chapter-card.active,.chapter-card.selected{background:rgba(139,92,246,.13);border-color:rgba(139,92,246,.3);color:#f0ebff}
-    .chapter-card-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:850}
-    .chapter-card-time{grid-column:2;grid-row:1;color:#a58fff;font-size:9px;font-weight:850;font-variant-numeric:tabular-nums}
-    .chapter-card-count{grid-column:1/-1;color:#6f7682;font-size:8px;font-weight:700}
-    .chapter-other-card{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;background:transparent;color:#868d99;cursor:pointer;font-size:9px;font-weight:750}
-    .chapter-other-card:hover{border-color:rgba(139,92,246,.2);color:#cfc6ef;background:rgba(139,92,246,.045)}
-
-    .chapter-focus{margin:0 8px 9px;border:1px solid rgba(139,92,246,.18);border-radius:10px;background:rgba(139,92,246,.035);overflow:hidden}
-    .chapter-focus-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px;border-bottom:1px solid rgba(139,92,246,.14);background:rgba(139,92,246,.045)}
-    .chapter-focus-title{min-width:0;display:grid;gap:1px}
-    .chapter-focus-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ebe5ff;font-size:11px}
-    .chapter-focus-title span{color:#777e89;font-size:8px;font-weight:700}
-    .chapter-focus-play{border:1px solid rgba(139,92,246,.18);border-radius:7px;background:rgba(139,92,246,.1);color:#bcaeff;padding:5px 8px;font-size:9px;font-weight:850;cursor:pointer}
-    .chapter-focus .timestamp-row{margin:0 4px;border-radius:7px}
-    .chapter-focus .timestamp-row:last-child{margin-bottom:4px}
-
-    .timestamp-all{padding:5px 6px 8px}
-    .timestamp-block{margin:5px 0;border:1px solid rgba(139,92,246,.14);border-radius:9px;background:rgba(139,92,246,.025);overflow:hidden}
-    .timestamp-block.active-group{border-color:rgba(139,92,246,.32);box-shadow:0 0 0 1px rgba(139,92,246,.06)}
-    .timestamp-group-line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px;padding:0;background:rgba(139,92,246,.04);border-bottom:1px solid transparent}
-    .timestamp-block.open .timestamp-group-line{border-bottom-color:rgba(139,92,246,.12)}
-    .timestamp-group-toggle{min-width:0;display:flex;align-items:center;gap:7px;border:0;background:transparent;color:#e3dcfa;padding:7px 8px;text-align:left;cursor:pointer;font-size:10px;font-weight:850}
-    .timestamp-group-caret{display:inline-block;width:10px;color:#8377aa;font-size:8px;transition:transform .12s ease}
-    .timestamp-block.open .timestamp-group-caret{transform:rotate(90deg)}
-    .timestamp-group-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .timestamp-group-count{color:#6f7580;font-size:8px;font-weight:750}
-    .timestamp-group-time{color:#9f8cff;font-size:9px;font-weight:850;font-variant-numeric:tabular-nums;padding:0 2px}
-    .timestamp-group-play{margin-right:6px;border:0;border-radius:6px;background:rgba(139,92,246,.1);color:#bdafff;width:24px;height:22px;cursor:pointer;font-size:8px}
-    .timestamp-group-body{display:none;padding-bottom:3px}
-    .timestamp-block.open .timestamp-group-body{display:block}
-    .timestamp-group-body .timestamp-row{margin:0 4px;border-radius:6px}
-    .timestamp-standalone{margin:0}
-
-    .timestamp-row{min-height:30px!important}
-    .timestamp-time{min-width:50px!important;font-size:10px!important}
-    .timestamp-label{font-size:10px!important;line-height:1.2!important}
-    .timestamp-delete{opacity:.45!important}
-    .timestamp-row:hover .timestamp-delete{opacity:1!important}
-
-    .preview-grouped-row{display:grid;grid-template-columns:minmax(95px,.7fr) 82px minmax(0,1.5fr);gap:7px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:7px;background:#0d1014}
-    .preview-grouped-row input{margin:0;min-width:0}
-    .preview-grouped-row input[data-k="group"]{color:#d7ccff}
-
-    @media(max-width:620px){
-      .chapter-overview-grid{grid-template-columns:1fr}
-      .preview-grouped-row{grid-template-columns:1fr 72px}
-      .preview-grouped-row input[data-k="label"]{grid-column:1/-1}
-    }
-  `;
-  document.head.appendChild(style);
+  try{viewMode=localStorage.getItem(VIEW_KEY)||'chapters'}catch{}
+  function saveViewMode(){try{localStorage.setItem(VIEW_KEY,viewMode)}catch{}}
+  function getCurrentItem(){return typeof itemById==='function'?itemById(state.selectedId):null}
 
   function ensureModeBar(){
-    let bar=$('#timestampViewMode');
-    if(bar)return bar;
-    const panel=$('.timestamp-panel'),head=panel?.querySelector('.timestamp-head');
-    if(!panel||!head)return null;
-    bar=document.createElement('div');
-    bar.id='timestampViewMode';
-    bar.className='timestamp-view-mode';
-    bar.innerHTML=`<div class="timestamp-view-tabs">
-      <button class="timestamp-view-tab" data-mode="chapters">見出し</button>
-      <button class="timestamp-view-tab" data-mode="all">すべて</button>
-    </div><div class="timestamp-view-meta" id="timestampViewMeta"></div>`;
+    let bar=$('#timestampViewMode');if(bar)return bar;
+    const panel=$('.timestamp-panel'),head=panel?.querySelector('.timestamp-head');if(!panel||!head)return null;
+    bar=document.createElement('div');bar.id='timestampViewMode';bar.className='timestamp-view-mode';
+    bar.innerHTML=`<div class="timestamp-view-tabs"><button class="timestamp-view-tab" data-mode="chapters">見出し</button><button class="timestamp-view-tab" data-mode="all">すべて</button></div><div class="timestamp-view-meta" id="timestampViewMeta"></div>`;
     head.insertAdjacentElement('afterend',bar);
-    bar.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{
-      viewMode=b.dataset.mode;
-      localStorage.setItem(VIEW_KEY,viewMode);
-      renderCurrentMode();
-    });
+    bar.querySelectorAll('[data-mode]').forEach(button=>button.onclick=()=>{viewMode=button.dataset.mode;saveViewMode();renderCurrentMode()});
     return bar;
   }
-
-  function rowHtml(t,i,extraClass=''){
-    return `<div class="timestamp-row ${extraClass}" data-time="${t.time}">
-      <button class="timestamp-time timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${fmt(t.time)}</button>
-      <button class="timestamp-label timestamp-jump" data-time="${t.time}" title="${attr(t.label)}">${esc(t.label)}</button>
-      <button class="timestamp-delete" data-index="${i}" title="削除">×</button>
+  function roleClass(t){
+    if(t.role==='parent')return 'timestamp-role-parent';
+    if(t.role==='child')return 'timestamp-role-child';
+    return '';
+  }
+  function rowHtml(t,index,extraClass=''){
+    const badge=t.role==='parent'?'<span class="timestamp-role-badge">親</span>':'';
+    const subtitle=t.subtitle?`<span class="timestamp-subtitle">${esc(t.subtitle)}</span>`:'';
+    const title=t.role==='child'&&t.parentLabel?`親: ${t.parentLabel}`:t.label;
+    return `<div class="timestamp-row ${roleClass(t)} ${extraClass}" data-time="${Number(t.time)||0}"${t.role==='child'&&t.parentLabel?` title="${attr(title)}"`:''}>
+      <button class="timestamp-time timestamp-jump" data-time="${Number(t.time)||0}" title="${attr(t.label)}">${fmt(t.time)}</button>
+      <button class="timestamp-label timestamp-jump" data-time="${Number(t.time)||0}" title="${attr(t.label)}"><span>${esc(t.label)}</span>${badge}${subtitle}</button>
+      <button class="timestamp-delete" data-index="${index}" title="削除" aria-label="${attr(t.label)}を削除">×</button>
     </div>`;
   }
-
   function buildChapterRanges(rows){
     const result=[];
     for(let i=0;i<rows.length;){
       const group=String(rows[i].group||'').trim();
       if(!group){i++;continue}
-      let j=i+1;
-      while(j<rows.length&&String(rows[j].group||'').trim()===group)j++;
+      let j=i+1;while(j<rows.length&&String(rows[j].group||'').trim()===group)j++;
       result.push({name:group,start:Number(rows[i].time)||0,end:j<rows.length?Number(rows[j].time):Infinity,rowStart:i,rowEnd:j-1,count:j-i,index:result.length});
       i=j;
     }
     return result;
   }
-
-  function getCurrentItem(){return typeof itemById==='function'?itemById(state.selectedId):null}
-
   function getActiveChapter(currentTime){
-    const t=Number(currentTime)||0;
-    let active=-1;
-    chapterRanges.forEach((c,i)=>{if(t>=c.start&&t<c.end)active=i});
+    const time=Number(currentTime)||0;let active=-1;
+    chapterRanges.forEach((chapter,index)=>{if(time>=chapter.start&&time<chapter.end)active=index});
     return active;
   }
-
   function playAt(time){
-    const x=getCurrentItem();
-    if(!x)return;
-    if(state.player?.seekTo&&state.currentId===x.id){
-      state.player.seekTo(Number(time)||0,true);
-      state.player.playVideo?.();
-      if(typeof markRecent==='function')markRecent(x.id);
-    }else playItem(x.id,Number(time)||0);
+    const item=getCurrentItem();if(!item)return;
+    if(state.player?.seekTo&&state.currentId===item.id){
+      state.player.seekTo(Number(time)||0,true);state.player.playVideo?.();markRecent(item.id);
+    }else playItem(item.id,Number(time)||0);
   }
-
   function selectChapter(index,{play=false}={}){
-    if(!chapterRanges[index])return;
-    selectedChapter=index;
-    if(play)playAt(chapterRanges[index].start);
-    renderCurrentMode();
+    if(!chapterRanges[index])return;selectedChapter=index;
+    if(play)playAt(chapterRanges[index].start);renderCurrentMode();
   }
-
   function bindCommonActions(){
-    const x=getCurrentItem();
-    if(!x)return;
-    $$('.timestamp-jump').forEach(b=>b.onclick=()=>playItem(x.id,Number(b.dataset.time)));
-    $$('.timestamp-delete').forEach(b=>b.onclick=()=>{
-      x.timestamps.splice(Number(b.dataset.index),1);
-      save();
-      window.renderTimestamps();
-      toast('タイムスタンプを削除しました');
+    const item=getCurrentItem();if(!item)return;
+    $$('.timestamp-jump').forEach(button=>button.onclick=()=>playItem(item.id,Number(button.dataset.time)));
+    $$('.timestamp-delete').forEach(button=>button.onclick=()=>{
+      const index=Number(button.dataset.index),before=[...(item.timestamps||[])];
+      item.timestamps.splice(index,1);
+      if(!save()){item.timestamps=before;return}
+      renderTimestamps();toast('タイムスタンプを削除しました');
     });
   }
-
+  function parentOverviewHtml(rows){
+    const parents=rows.filter(row=>row.role==='parent');
+    if(!parents.length)return '';
+    return `<div class="role-parent-overview" id="roleParentOverview"><div class="role-parent-head"><strong>親タイムスタンプ</strong><span>${parents.length}件</span></div><div class="role-parent-grid">${parents.map(parent=>{
+      const count=rows.filter(row=>row.role==='child'&&Number(row.parentTime)===Number(parent.time)).length;
+      return `<button type="button" class="role-parent-card" data-parent-time="${Number(parent.time)||0}"><span class="role-parent-name">${esc(parent.label||'親')}</span><span class="role-parent-time">${fmt(parent.time)}</span><small>${count?`${count}子項目`:'親タイムスタンプ'}</small></button>`;
+    }).join('')}</div></div>`;
+  }
+  function bindParentOverview(){
+    $$('[data-parent-time]').forEach(button=>button.onclick=()=>playAt(Number(button.dataset.parentTime)||0));
+  }
   function renderChapterMode(rows){
     const view=$('#timestampView');
-    const standaloneCount=rows.filter(r=>!String(r.group||'').trim()).length;
+    const standaloneCount=rows.filter(row=>!String(row.group||'').trim()).length;
     if(!chapterRanges.length){
-      view.innerHTML=`<div class="chapter-overview"><div class="empty-copy"><strong>見出しがありません</strong><span>この動画は見出しグループがないため「すべて」で確認できます。</span></div><button class="chapter-other-card" id="openAllTimestamps"><span>すべてのタイムスタンプを見る</span><span>${rows.length}件</span></button></div>`;
-      $('#openAllTimestamps').onclick=()=>{viewMode='all';localStorage.setItem(VIEW_KEY,viewMode);renderCurrentMode()};
+      const parentHtml=parentOverviewHtml(rows);
+      view.innerHTML=`<div class="chapter-overview">${parentHtml}<div class="empty-copy"><strong>${parentHtml?'大見出しはありません':'見出しがありません'}</strong><span>${parentHtml?'親タイムスタンプから直接ジャンプできます。全件を時系列で見る場合は「すべて」を使ってください。':'この動画は見出しグループがないため「すべて」で確認できます。'}</span></div><button class="chapter-other-card" id="openAllTimestamps"><span>すべてのタイムスタンプを見る</span><span>${rows.length}件</span></button></div>`;
+      bindParentOverview();
+      $('#openAllTimestamps').onclick=()=>{viewMode='all';saveViewMode();renderCurrentMode()};
       return;
     }
 
     if(selectedChapter<0||!chapterRanges[selectedChapter])selectedChapter=Math.max(0,getActiveChapter(state.player?.getCurrentTime?.()||0));
-    const selected=chapterRanges[selectedChapter];
-    const active=getActiveChapter(state.player?.getCurrentTime?.()||0);
-
+    const selected=chapterRanges[selectedChapter],active=getActiveChapter(state.player?.getCurrentTime?.()||0);
     let html='<div class="chapter-overview"><div class="chapter-overview-grid">';
-    chapterRanges.forEach((c,i)=>{
-      html+=`<button class="chapter-card ${i===active?'active':''} ${i===selectedChapter?'selected':''}" data-select-chapter="${i}"><span class="chapter-card-name">${esc(c.name)}</span><span class="chapter-card-time">${fmt(c.start)}</span><span class="chapter-card-count">${c.count}項目</span></button>`;
+    chapterRanges.forEach((chapter,index)=>{
+      html+=`<button class="chapter-card ${index===active?'active':''} ${index===selectedChapter?'selected':''}" data-select-chapter="${index}"><span class="chapter-card-name">${esc(chapter.name)}</span><span class="chapter-card-time">${fmt(chapter.start)}</span><span class="chapter-card-count">${chapter.count}項目</span></button>`;
     });
     if(standaloneCount)html+=`<button class="chapter-other-card" id="openAllTimestamps"><span>その他のタイムスタンプ</span><span>${standaloneCount}件 →</span></button>`;
     html+='</div></div>';
-
     if(selected){
       html+=`<div class="chapter-focus"><div class="chapter-focus-head"><div class="chapter-focus-title"><strong>${esc(selected.name)}</strong><span>${fmt(selected.start)} ・ ${selected.count}項目</span></div><button class="chapter-focus-play" data-play-chapter="${selectedChapter}">▶ ここから再生</button></div>`;
       for(let i=selected.rowStart;i<=selected.rowEnd;i++)html+=rowHtml(rows[i],i);
       html+='</div>';
     }
-
     view.innerHTML=html;
-    $$('[data-select-chapter]').forEach(b=>b.onclick=()=>selectChapter(Number(b.dataset.selectChapter),{play:true}));
-    $$('[data-play-chapter]').forEach(b=>b.onclick=()=>playAt(chapterRanges[Number(b.dataset.playChapter)]?.start||0));
-    $('#openAllTimestamps')?.addEventListener('click',()=>{viewMode='all';localStorage.setItem(VIEW_KEY,viewMode);renderCurrentMode()});
+    $$('[data-select-chapter]').forEach(button=>button.onclick=()=>selectChapter(Number(button.dataset.selectChapter),{play:true}));
+    $$('[data-play-chapter]').forEach(button=>button.onclick=()=>playAt(chapterRanges[Number(button.dataset.playChapter)]?.start||0));
+    $('#openAllTimestamps')?.addEventListener('click',()=>{viewMode='all';saveViewMode();renderCurrentMode()});
     bindCommonActions();
   }
-
   function renderAllMode(rows){
-    const view=$('#timestampView');
-    const active=getActiveChapter(state.player?.getCurrentTime?.()||0);
-    let html='<div class="timestamp-all">';
-    let chapterIndex=0;
-
+    const view=$('#timestampView'),active=getActiveChapter(state.player?.getCurrentTime?.()||0);
+    let html='<div class="timestamp-all">',chapterIndex=0;
     for(let i=0;i<rows.length;){
       const group=String(rows[i].group||'').trim();
       if(group){
-        const c=chapterRanges[chapterIndex];
-        const open=expandedChapters.has(chapterIndex)||chapterIndex===active;
-        html+=`<div class="timestamp-block ${open?'open':''} ${chapterIndex===active?'active-group':''}" data-chapter-index="${chapterIndex}"><div class="timestamp-group-line"><button class="timestamp-group-toggle" data-toggle-chapter="${chapterIndex}"><span class="timestamp-group-caret">▶</span><span class="timestamp-group-name">${esc(group)}</span><span class="timestamp-group-count">${c.count}</span></button><span class="timestamp-group-time">${fmt(c.start)}</span><button class="timestamp-group-play" data-play-chapter="${chapterIndex}" title="${attr(group)}の先頭から再生">▶</button></div><div class="timestamp-group-body">`;
-        let j=i;
-        while(j<rows.length&&String(rows[j].group||'').trim()===group){html+=rowHtml(rows[j],j);j++}
-        html+='</div></div>';
-        chapterIndex++;
-        i=j;
-      }else{
-        html+=rowHtml(rows[i],i,'timestamp-standalone');
-        i++;
-      }
+        const chapter=chapterRanges[chapterIndex],open=expandedChapters.has(chapterIndex)||chapterIndex===active;
+        html+=`<div class="timestamp-block ${open?'open':''} ${chapterIndex===active?'active-group':''}" data-chapter-index="${chapterIndex}"><div class="timestamp-group-line"><button class="timestamp-group-toggle" data-toggle-chapter="${chapterIndex}" aria-expanded="${open}"><span class="timestamp-group-caret">▶</span><span class="timestamp-group-name">${esc(group)}</span><span class="timestamp-group-count">${chapter.count}</span></button><span class="timestamp-group-time">${fmt(chapter.start)}</span><button class="timestamp-group-play" data-play-chapter="${chapterIndex}" title="${attr(group)}の先頭から再生">▶</button></div><div class="timestamp-group-body">`;
+        let j=i;while(j<rows.length&&String(rows[j].group||'').trim()===group){html+=rowHtml(rows[j],j);j++}
+        html+='</div></div>';chapterIndex++;i=j;
+      }else{html+=rowHtml(rows[i],i,'timestamp-standalone');i++}
     }
-    html+='</div>';
-    view.innerHTML=html;
-
-    $$('[data-toggle-chapter]').forEach(b=>b.onclick=()=>{
-      const i=Number(b.dataset.toggleChapter);
-      if(expandedChapters.has(i))expandedChapters.delete(i);else expandedChapters.add(i);
-      selectedChapter=i;
-      renderCurrentMode();
+    html+='</div>';view.innerHTML=html;
+    $$('[data-toggle-chapter]').forEach(button=>button.onclick=()=>{
+      const index=Number(button.dataset.toggleChapter);
+      expandedChapters.has(index)?expandedChapters.delete(index):expandedChapters.add(index);
+      selectedChapter=index;renderCurrentMode();
     });
-    $$('[data-play-chapter]').forEach(b=>b.onclick=()=>{
-      const i=Number(b.dataset.playChapter);
-      selectedChapter=i;
-      expandedChapters.add(i);
-      playAt(chapterRanges[i]?.start||0);
-      renderCurrentMode();
+    $$('[data-play-chapter]').forEach(button=>button.onclick=()=>{
+      const index=Number(button.dataset.playChapter);selectedChapter=index;expandedChapters.add(index);
+      playAt(chapterRanges[index]?.start||0);renderCurrentMode();
     });
     bindCommonActions();
   }
-
-  function renderCurrentMode(){
-    const x=getCurrentItem();
-    const view=$('#timestampView');
-    const rows=x?.timestamps||[];
-    ensureModeBar();
-    $$('.timestamp-view-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===viewMode));
-    const meta=$('#timestampViewMeta');
-    if(meta)meta.textContent=viewMode==='chapters'?`${chapterRanges.length}見出し`:`${rows.length}件`;
-
-    if(!x||!rows.length){
-      view.className='timestamp-view empty';
-      view.innerHTML='<div class="empty-copy"><strong>タイムスタンプなし</strong><span>コメント欄のタイムスタンプを貼り付けて登録できます。</span></div>';
-      return;
-    }
-
-    view.className='timestamp-view';
-    if(viewMode==='chapters')renderChapterMode(rows);else renderAllMode(rows);
+  function updateRowActive(currentTime){
+    const rows=$$('.timestamp-row');
+    if(!rows.length||state.currentId!==state.selectedId){rows.forEach(row=>row.classList.remove('active'));return}
+    let active=-1;rows.forEach((row,index)=>{if(Number(row.dataset.time)<=currentTime)active=index});
+    rows.forEach((row,index)=>row.classList.toggle('active',index===active));
   }
-
-  window.renderTimestamps=function(){
-    const x=getCurrentItem();
-    const rows=x?.timestamps||[];
-    if($('#timestampCount'))$('#timestampCount').textContent=rows.length;
-    if(rows.length)rows.sort((a,b)=>a.time-b.time);
-    chapterRanges=buildChapterRanges(rows);
-    selectedChapter=-1;
-    lastActiveChapter=-1;
-    expandedChapters.clear();
-    renderCurrentMode();
-  };
-
-  const originalUpdateActiveTimestamp=window.updateActiveTimestamp;
-  window.updateActiveTimestamp=function(currentTime){
-    if(typeof originalUpdateActiveTimestamp==='function')originalUpdateActiveTimestamp(currentTime);
+  function updatePlaybackHighlight(currentTime){
+    updateRowActive(currentTime);
     const active=getActiveChapter(currentTime);
-    if(active!==lastActiveChapter){
-      lastActiveChapter=active;
-      if(active>=0){
-        selectedChapter=active;
-        expandedChapters.add(active);
-        if(viewMode==='chapters')renderCurrentMode();
-        else $$('.timestamp-block').forEach(b=>b.classList.toggle('active-group',Number(b.dataset.chapterIndex)===active));
-      }else $$('.timestamp-block').forEach(b=>b.classList.remove('active-group'));
-    }
-  };
-
-  window.showTimestampPreview=function(){
-    const rows=state.parsedTimestamps;
-    $('#parseSummary').textContent=`${rows.length}件検出しました`;
-    $('#timestampPreview').innerHTML=rows.map((t,i)=>`<div class="preview-grouped-row"><input aria-label="見出し" data-i="${i}" data-k="group" value="${attr(t.group||'')}" placeholder="見出しなし"><input aria-label="時間" data-i="${i}" data-k="time" value="${fmt(t.time)}"><input aria-label="内容" data-i="${i}" data-k="label" value="${attr(t.label)}"></div>`).join('');
-    $('#saveTimestampsBtn').disabled=!rows.length;
-    $$('#timestampPreview input').forEach(el=>el.onchange=()=>{
-      const i=Number(el.dataset.i),key=el.dataset.k;
-      if(key==='time'){
-        const n=parseTime(el.value);if(n!=null)state.parsedTimestamps[i].time=n;
-      }else if(key==='group'){
-        state.parsedTimestamps[i].group=el.value.trim();
-        state.parsedTimestamps[i].tags=guessTags(state.parsedTimestamps[i].label,state.parsedTimestamps[i].group);
-      }else{
-        state.parsedTimestamps[i].label=el.value.trim()||'タイムスタンプ';
-        state.parsedTimestamps[i].tags=guessTags(state.parsedTimestamps[i].label,state.parsedTimestamps[i].group||'');
+    if(active===lastActiveChapter)return;
+    lastActiveChapter=active;
+    if(active>=0){selectedChapter=active;expandedChapters.add(active)}
+    if(viewMode==='chapters'&&chapterRanges.length){renderCurrentMode();return}
+    $$('.timestamp-block').forEach(block=>{
+      const isActive=Number(block.dataset.chapterIndex)===active;
+      block.classList.toggle('active-group',isActive);
+      if(isActive){
+        block.classList.add('open');
+        block.querySelector('.timestamp-group-toggle')?.setAttribute('aria-expanded','true');
       }
     });
-  };
-
-  function saveGroupedTimestamps(){
-    const x=itemById(state.selectedId);if(!x)return;
-    x.timestamps=x.timestamps||[];
-    const importedTimes=new Set(state.parsedTimestamps.map(t=>Number(t.time)));
-    const before=x.timestamps.length;
-    x.timestamps=x.timestamps.filter(t=>!importedTimes.has(Number(t.time)));
-    const removed=before-x.timestamps.length;
-
-    for(const t of state.parsedTimestamps){
-      const group=String(t.group||'').trim();
-      if(!x.timestamps.some(z=>z.time===t.time&&z.label===t.label&&String(z.group||'')===group))x.timestamps.push({...t,group});
+  }
+  function renderCurrentMode(){
+    const item=getCurrentItem(),view=$('#timestampView'),rows=item?.timestamps||[];
+    ensureModeBar();
+    $$('.timestamp-view-tab').forEach(button=>button.classList.toggle('active',button.dataset.mode===viewMode));
+    const meta=$('#timestampViewMeta');if(meta)meta.textContent=viewMode==='chapters'?`${chapterRanges.length}見出し`:`${rows.length}件`;
+    if(!item||!rows.length){
+      view.className='timestamp-view empty';view.innerHTML='<div class="empty-copy"><strong>タイムスタンプなし</strong><span>コメント欄のタイムスタンプを貼り付けて登録できます。</span></div>';return;
     }
-    x.timestamps.sort((a,b)=>a.time-b.time);
-    save();
-    $('#timestampDialog').close();
-    window.renderTimestamps();
-    renderFilters();
-    toast(removed?`タイムスタンプを再解析して${removed}件置き換えました`:'タイムスタンプを追加しました');
+    view.className='timestamp-view';
+    if(viewMode==='chapters')renderChapterMode(rows);else renderAllMode(rows);
+    updateRowActive(state.player?.getCurrentTime?.()||0);
+  }
+  function renderTimestamps(){
+    const item=getCurrentItem(),rows=item?.timestamps||[];
+    if($('#timestampCount'))$('#timestampCount').textContent=rows.length;
+    if(rows.length)rows.sort((a,b)=>Number(a.time)-Number(b.time));
+    chapterRanges=buildChapterRanges(rows);selectedChapter=-1;lastActiveChapter=-1;expandedChapters.clear();
+    renderCurrentMode();
+    document.dispatchEvent(new CustomEvent('asmrtube:timestamps-rendered',{detail:{item,rows}}));
+  }
+  function renderTimestampPreview(){
+    const rows=state.parsedTimestamps||[];
+    $('#parseSummary').textContent=`${rows.length}件検出しました`;
+    $('#timestampPreview').innerHTML=rows.map((t,index)=>`<div class="preview-grouped-row"><input aria-label="見出し" data-i="${index}" data-k="group" value="${attr(t.group||'')}" placeholder="見出しなし"><input aria-label="時間" data-i="${index}" data-k="time" value="${fmt(t.time)}"><input aria-label="内容" data-i="${index}" data-k="label" value="${attr(t.label)}"></div>`).join('');
+    $('#saveTimestampsBtn').disabled=!rows.length;
+    $$('#timestampPreview input').forEach(input=>input.onchange=()=>{
+      const index=Number(input.dataset.i),key=input.dataset.k,row=state.parsedTimestamps[index];if(!row)return;
+      if(key==='time'){const time=parseTime(input.value);if(time!=null)row.time=time}
+      else if(key==='group'){row.group=input.value.trim();row.tags=guessTags(row.label,row.group,row.subtitle||'')}
+      else{row.label=input.value.trim()||'タイムスタンプ';row.tags=guessTags(row.label,row.group||'',row.subtitle||'')}
+    });
   }
 
-  const saveBtn=$('#saveTimestampsBtn');
-  if(saveBtn)saveBtn.onclick=saveGroupedTimestamps;
+  document.addEventListener('asmrtube:timestamps-render-request',renderTimestamps);
+  document.addEventListener('asmrtube:player-time',event=>updatePlaybackHighlight(Number(event.detail?.currentTime)||0));
+  document.addEventListener('asmrtube:timestamp-preview-request',renderTimestampPreview);
+
+  renderTimestamps();
 })();
