@@ -1,6 +1,6 @@
 {
-  "guideVersion": "1.1.0",
+  "guideVersion": "1.11.0",
   "profiles": ["STATIC", "DATA", "MEDIA", "TOOL"],
-  "appVersion": "2.3.0",
+  "appVersion": "2.4.0",
   "schemaVersion": 1
 }
