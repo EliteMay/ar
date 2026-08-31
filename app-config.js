@@ -3,8 +3,8 @@
   'use strict';
 
   const config=Object.freeze({
-    appVersion:'2.4.0',
-    build:'20260831-1',
+    appVersion:'3.0.0',
+    build:'20260901-1',
     schemaVersion:1,
     guideVersion:'1.11.0',
     profiles:Object.freeze(['STATIC','DATA','MEDIA','TOOL'])
@@ -26,7 +26,6 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyVersion,{once:true});
   else applyVersion();
 
-  // Compatibility bridge for the product shell, which creates the sidebar badge after this file loads.
   const observer=new MutationObserver(()=>{
     if(applyVersion())observer.disconnect();
   });
