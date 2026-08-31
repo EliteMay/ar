@@ -23,9 +23,7 @@
     startDashboard:false
   };
 
-  try{
-    settings={...settings,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')};
-  }catch{}
+  try{settings={...settings,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')}}catch{}
 
   function saveSettings(){
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))}catch{}
@@ -41,34 +39,12 @@
     return dimmer;
   }
 
-  function applyAppearance({save=true}={}){
-    const theme=THEMES[settings.theme]?settings.theme:'violet';
-    const brightness=Math.max(30,Math.min(100,Number(settings.brightness)||100));
-    settings.theme=theme;
-    settings.brightness=brightness;
-
-    document.documentElement.dataset.theme=theme;
-    document.documentElement.dataset.compact=settings.compact?'1':'0';
-    document.documentElement.dataset.thumbs=settings.showThumbs?'1':'0';
-    document.documentElement.dataset.reduceMotion=settings.reduceMotion?'1':'0';
-    document.body.dataset.theme=theme;
-
-    const dimmer=ensureDimmer();
-    dimmer.style.opacity=String((100-brightness)/100);
-
-    const themeMeta=$('meta[name="theme-color"]');
-    if(themeMeta)themeMeta.setAttribute('content',THEMES[theme].themeColor);
-
-    syncControls();
-    if(save)saveSettings();
-    document.dispatchEvent(new CustomEvent('asmrtube:appearance-change',{detail:{...settings}}));
-  }
-
   function syncControls(){
     $$('[data-theme-choice]').forEach(button=>{
       const active=button.dataset.themeChoice===settings.theme;
       button.classList.toggle('active',active);
       button.setAttribute('aria-pressed',String(active));
+      button.setAttribute('aria-label',`${button.querySelector('strong')?.textContent||'テーマ'}${active?'（選択中）':''}`);
     });
 
     const brightness=$('#appearanceBrightness');
@@ -92,11 +68,39 @@
     if(currentTheme)currentTheme.textContent=THEMES[settings.theme]?.label||THEMES.violet.label;
   }
 
+  function applyAppearance({save=true}={}){
+    const theme=THEMES[settings.theme]?settings.theme:'violet';
+    const brightness=Math.max(30,Math.min(100,Number(settings.brightness)||100));
+    settings.theme=theme;
+    settings.brightness=brightness;
+
+    document.documentElement.dataset.theme=theme;
+    document.documentElement.dataset.compact=settings.compact?'1':'0';
+    document.documentElement.dataset.thumbs=settings.showThumbs?'1':'0';
+    document.documentElement.dataset.reduceMotion=settings.reduceMotion?'1':'0';
+    document.body.dataset.theme=theme;
+
+    ensureDimmer().style.opacity=String((100-brightness)/100);
+    const themeMeta=$('meta[name="theme-color"]');
+    if(themeMeta)themeMeta.setAttribute('content',THEMES[theme].themeColor);
+
+    syncControls();
+    if(save)saveSettings();
+    document.dispatchEvent(new CustomEvent('asmrtube:appearance-change',{detail:{...settings}}));
+  }
+
+  function cleanupLegacyHeaderControls(){
+    // v2 Product Shell injected these into the brand row. v3 has a dedicated
+    // settings page and Help inside it, so leaving both routes visible makes
+    // the primary navigation noisy. The dialogs themselves remain available.
+    $('#settingsBtn')?.remove();
+    $('#helpBtn')?.remove();
+  }
+
   function showSettings(event){
     if(event){
       event.preventDefault();
-      event.stopImmediatePropagation?.();
-      event.stopPropagation?.();
+      event.stopPropagation();
     }
     try{window.asmrtubeProductShell?.hideDashboard?.()}catch{}
     const page=$('#settingsPage');
@@ -106,7 +110,7 @@
     page.hidden=false;
     $('#settingsPageBtn')?.classList.add('active');
     syncControls();
-    window.scrollTo?.({top:0,behavior:'instant'});
+    window.scrollTo?.(0,0);
   }
 
   function hideSettings(){
@@ -117,17 +121,15 @@
   }
 
   function bindSettingsTriggers(){
-    $('#settingsPageBtn')?.addEventListener('click',showSettings);
-    $('#settingsBackBtn')?.addEventListener('click',hideSettings);
-
-    // Product Shell v2 created a settings dialog. The visible gear is retained,
-    // but v3 routes it to the dedicated page instead of the legacy dialog.
-    const gear=$('#settingsBtn');
-    if(gear&&!gear.dataset.v3Settings){
-      gear.dataset.v3Settings='1';
-      gear.addEventListener('click',showSettings,true);
-      gear.title='設定ページ';
-      gear.setAttribute('aria-label','設定ページを開く');
+    const button=$('#settingsPageBtn');
+    if(button&&!button.dataset.v3Bound){
+      button.dataset.v3Bound='1';
+      button.addEventListener('click',showSettings);
+    }
+    const back=$('#settingsBackBtn');
+    if(back&&!back.dataset.v3Bound){
+      back.dataset.v3Bound='1';
+      back.addEventListener('click',hideSettings);
     }
   }
 
@@ -170,7 +172,7 @@
     $('#settingsHelpBtnV3')?.addEventListener('click',()=>{
       const dialog=$('#helpDialog');
       if(dialog?.showModal)dialog.showModal();
-      else $('#helpBtn')?.click();
+      else toast?.('ヘルプを準備できませんでした');
     });
   }
 
@@ -195,6 +197,7 @@
   }
 
   applyAppearance({save:false});
+  cleanupLegacyHeaderControls();
   bindSettingsTriggers();
   bindControls();
   bindWorkspaceExit();
@@ -203,8 +206,12 @@
   const title=$('#nowTitle');
   if(title)new MutationObserver(syncMediaArt).observe(title,{childList:true,characterData:true,subtree:true});
 
-  // ui-enhancements.js is allowed to create the gear slightly later in future refactors.
-  const shellObserver=new MutationObserver(()=>bindSettingsTriggers());
+  // Compatibility shell may insert its old brand controls after this module in
+  // a future load-order change. Keep the v3 navigation canonical.
+  const shellObserver=new MutationObserver(()=>{
+    cleanupLegacyHeaderControls();
+    bindSettingsTriggers();
+  });
   shellObserver.observe(document.documentElement,{childList:true,subtree:true});
   setTimeout(()=>shellObserver.disconnect(),8000);
 
