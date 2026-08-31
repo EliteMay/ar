@@ -6,8 +6,9 @@ const failures=[];
 
 function fail(message){failures.push(message)}
 function exists(relative){return fs.existsSync(path.join(root,relative))}
+function read(relative){return fs.readFileSync(path.join(root,relative),'utf8')}
 
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const html=read('index.html');
 const refs=[...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(m=>m[1]);
 for(const ref of refs){
   if(/^(?:https?:|data:|#)/i.test(ref))continue;
@@ -33,6 +34,7 @@ const required=[
   'app.js',
   'app-quality-v21.js',
   'ui-enhancements.js',
+  'appearance.js',
   'library-tools-v22.js',
   'timestamp-parser.js',
   'timestamp-ui.js',
@@ -41,9 +43,12 @@ const required=[
   'asmr-overrides.css',
   'ui-base-v2.css',
   'product-v2.css',
+  'timestamp-ui.css',
   'quality-v21.css',
   'library-tools-v22.css',
+  'theme.css',
   'workspace.css',
+  'settings.css',
   'project-meta.json',
   'README.md',
   'PROJECT_LEARNINGS.md',
@@ -52,8 +57,10 @@ const required=[
 ];
 for(const file of required)if(!exists(file))fail(`required file is missing: ${file}`);
 
-const meta=JSON.parse(fs.readFileSync(path.join(root,'project-meta.json'),'utf8'));
-const configSource=fs.readFileSync(path.join(root,'app-config.js'),'utf8');
+const meta=JSON.parse(read('project-meta.json'));
+const configSource=read('app-config.js');
+const appearanceSource=read('appearance.js');
+const timestampUiSource=read('timestamp-ui.js');
 function configString(key){return configSource.match(new RegExp(`${key}:\\s*['\"]([^'\"]+)['\"]`))?.[1]||null}
 function configNumber(key){const value=configSource.match(new RegExp(`${key}:\\s*(\\d+)`))?.[1];return value==null?null:Number(value)}
 
@@ -62,16 +69,56 @@ if(configString('guideVersion')!==meta.guideVersion)fail(`guideVersion mismatch:
 if(configNumber('schemaVersion')!==meta.schemaVersion)fail(`schemaVersion mismatch: app-config.js=${configNumber('schemaVersion')} project-meta.json=${meta.schemaVersion}`);
 if(!html.includes(`<title>ASMRTube v${meta.appVersion}</title>`))fail(`index.html title does not match appVersion ${meta.appVersion}`);
 
-if(!html.includes('library-tools-v22.js?v=2.2'))fail('v2.2 library tools JavaScript is not connected');
-if(!html.includes('library-tools-v22.css?v=2.2'))fail('v2.2 library tools CSS is not connected');
-if(!html.includes('workspace.css?v=2.4'))fail('canonical v2.4 workspace CSS is not connected');
+const requiredRuntime=[
+  'app-config.js?v=3.0',
+  'app.js?v=3',
+  'timestamp-parser.js?v=1.9',
+  'timestamp-ui.js?v=3.0',
+  'ui-enhancements.js?v=3.0',
+  'app-quality-v21.js?v=2.1',
+  'timestamp-polish-v21.js?v=2.1',
+  'library-tools-v22.js?v=2.2',
+  'appearance.js?v=3.0'
+];
+for(const ref of requiredRuntime)if(!html.includes(ref))fail(`required runtime is not connected: ${ref}`);
 
-const productIndex=html.indexOf('product-v2.css');
-const libraryIndex=html.indexOf('library-tools-v22.css');
-const workspaceIndex=html.indexOf('workspace.css?v=2.4');
-if(workspaceIndex<0||workspaceIndex<productIndex||workspaceIndex<libraryIndex){
-  fail('workspace.css must load after legacy/product/library visual layers');
-}
+const requiredVisual=[
+  'timestamp-ui.css?v=3.0',
+  'library-tools-v22.css?v=2.2',
+  'theme.css?v=3.0',
+  'workspace.css?v=3.0',
+  'settings.css?v=3.0'
+];
+for(const ref of requiredVisual)if(!html.includes(ref))fail(`required visual layer is not connected: ${ref}`);
+
+const indexOf=value=>html.indexOf(value);
+const productIndex=indexOf('product-v2.css');
+const libraryCssIndex=indexOf('library-tools-v22.css');
+const themeIndex=indexOf('theme.css?v=3.0');
+const workspaceIndex=indexOf('workspace.css?v=3.0');
+const settingsCssIndex=indexOf('settings.css?v=3.0');
+if(themeIndex<0||themeIndex<productIndex||themeIndex<libraryCssIndex)fail('theme.css must load after legacy/product/library CSS');
+if(workspaceIndex<themeIndex)fail('workspace.css must load after theme.css');
+if(settingsCssIndex<workspaceIndex)fail('settings.css must load after workspace.css');
+
+const parserIndex=indexOf('timestamp-parser.js?v=1.9');
+const timestampUiIndex=indexOf('timestamp-ui.js?v=3.0');
+const productShellIndex=indexOf('ui-enhancements.js?v=3.0');
+const appearanceIndex=indexOf('appearance.js?v=3.0');
+if(timestampUiIndex<parserIndex)fail('timestamp-ui.js must load after timestamp-parser.js');
+if(productShellIndex<timestampUiIndex)fail('ui-enhancements.js must load after canonical timestamp UI');
+if(appearanceIndex<productShellIndex)fail('appearance.js must load after product shell so the settings gear routes to the v3 page');
+
+if(!html.includes('id="settingsPage"'))fail('dedicated settings page is missing');
+if(!html.includes('id="settingsPageBtn"'))fail('settings page navigation button is missing');
+const themeChoices=[...html.matchAll(/data-theme-choice="([^"]+)"/g)].map(match=>match[1]);
+if(themeChoices.length<5)fail(`settings page needs multiple color themes; found ${themeChoices.length}`);
+if(new Set(themeChoices).size!==themeChoices.length)fail('theme choices contain duplicate ids');
+
+if(!appearanceSource.includes("const SETTINGS_KEY='asmrtube.settings.v1'"))fail('appearance settings must keep asmrtube.settings.v1');
+if(!appearanceSource.includes("theme:'violet'"))fail('appearance defaults must include a theme');
+if(!timestampUiSource.includes('window.renderTimestamps=renderTimestampsV3'))fail('canonical timestamp UI is not connected to global renderTimestamps');
+if(!timestampUiSource.includes('window.updateActiveTimestamp=updateActive'))fail('canonical timestamp UI is not connected to player highlighting');
 
 if(failures.length){
   console.error('\nASMRTube static check failed:\n');
@@ -79,4 +126,4 @@ if(failures.length){
   process.exit(1);
 }
 
-console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON files parsed, metadata aligned, canonical workspace connected.`);
+console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, v3 runtime and visual layers connected.`);

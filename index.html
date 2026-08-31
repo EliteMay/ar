@@ -1,19 +1,22 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="violet">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#090b0e">
+  <meta name="theme-color" content="#0b0911">
   <meta name="description" content="YouTube ASMRを整理・再生し、コメント欄の多様なタイムスタンプを見やすく使う個人向けライブラリ。">
-  <title>ASMRTube v2.4.0</title>
+  <title>ASMRTube v3.0.0</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css?v=2">
   <link rel="stylesheet" href="asmr-overrides.css?v=3">
   <link rel="stylesheet" href="ui-base-v2.css?v=2.0">
   <link rel="stylesheet" href="product-v2.css?v=2.0">
+  <link rel="stylesheet" href="timestamp-ui.css?v=3.0">
   <link rel="stylesheet" href="quality-v21.css?v=2.1">
   <link rel="stylesheet" href="library-tools-v22.css?v=2.2">
-  <link rel="stylesheet" href="workspace.css?v=2.4">
+  <link rel="stylesheet" href="theme.css?v=3.0">
+  <link rel="stylesheet" href="workspace.css?v=3.0">
+  <link rel="stylesheet" href="settings.css?v=3.0">
 </head>
 <body>
   <div class="app-shell">
@@ -21,32 +24,33 @@
       <div class="brand-row">
         <div class="brand-lockup">
           <div class="brand-mark">A</div>
-          <div><strong>ASMRTube</strong><span>ASMR LIBRARY</span></div>
+          <div><strong>ASMRTube</strong><span>PERSONAL ASMR DECK</span></div>
         </div>
-        <button class="icon-btn subtle" id="addVideoBtn" title="ASMRを追加">＋</button>
+        <button class="icon-btn subtle" id="addVideoBtn" title="ASMRを追加" aria-label="ASMRを追加">＋</button>
       </div>
 
-      <div class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="タイトル・配信者・タグ・タイムスタンプを検索"></div>
+      <div class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="タイトル・配信者・音を検索"></div>
 
-      <nav class="view-nav" id="nav">
+      <nav class="view-nav" id="nav" aria-label="ライブラリ表示">
         <button class="view-btn active" data-view="all"><span>すべて</span><span class="nav-count" id="countAll">0</span></button>
         <button class="view-btn" data-view="favorites"><span>お気に入り</span><span class="nav-count" id="countFav">0</span></button>
         <button class="view-btn" data-view="recent"><span>最近聴いた</span><span class="nav-count" id="countRecent">0</span></button>
         <button class="view-btn" data-view="sleep"><span>睡眠向け</span><span class="nav-count" id="countSleep">0</span></button>
       </nav>
 
-      <div class="playlist-head"><span>プレイリスト</span><button class="mini-icon" id="newPlaylistBtn">＋</button></div>
+      <div class="playlist-head"><span>プレイリスト</span><button class="mini-icon" id="newPlaylistBtn" title="プレイリスト作成">＋</button></div>
       <div id="playlistList" class="playlist-nav"></div>
 
       <div class="library-head">
         <span>ライブラリ <b id="resultCount">0</b></span>
-        <select id="sortSelect" class="mini-select"><option value="new">追加順</option><option value="title">タイトル</option><option value="rating">評価</option></select>
+        <select id="sortSelect" class="mini-select" aria-label="並び順"><option value="new">追加順</option><option value="title">タイトル</option><option value="rating">評価</option></select>
       </div>
       <div id="songList" class="song-list"></div>
 
       <div id="emptyState" class="sidebar-empty hidden"><p>まだASMRがありません</p><button class="primary-soft" id="emptyAddBtn">最初のASMRを追加</button></div>
 
       <div class="sidebar-tools">
+        <button class="ghost-btn sidebar-settings-page" id="settingsPageBtn" type="button">設定</button>
         <button class="ghost-btn" id="exportBtn">書き出し</button>
         <label class="ghost-btn file-label">読み込み<input type="file" id="importInput" accept="application/json"></label>
       </div>
@@ -75,27 +79,36 @@
 
       <div class="workspace">
         <section class="player-column">
-          <div class="player-card">
-            <div id="playerPlaceholder" class="player-placeholder"><div class="placeholder-mark">▶</div><strong>ASMRを選択してください</strong><span>登録したYouTube動画をここで再生します</span></div>
-            <div id="ytPlayerHost"></div>
-          </div>
+          <section class="media-deck" aria-label="再生デッキ">
+            <div class="media-ambient" aria-hidden="true"></div>
+            <div class="media-deck-label"><span>NOW PLAYING</span><i></i><span>YOUTUBE ASMR</span></div>
 
-          <div class="transport-card">
-            <button class="transport-btn" id="prevBtn" title="前へ">⏮</button>
-            <button class="transport-btn main-control" id="playBtn" title="再生 / 一時停止">▶</button>
-            <button class="transport-btn" id="nextBtn" title="次へ">⏭</button>
-            <button class="mode-btn" id="loopBtn">A-B</button>
-            <button class="mode-btn" id="sleepBtn">スリープ</button>
-          </div>
-
-          <div class="range-card">
-            <div class="progress-row"><span id="timeNow">0:00</span><input id="seek" type="range" min="0" max="1000" value="0"><span id="timeTotal">0:00</span></div>
-            <div class="player-options">
-              <label><span>音量</span><input id="volume" type="range" min="0" max="100" value="35"></label>
-              <div id="loopStatus" class="status-pill">区間リピート: OFF</div>
-              <div id="sleepStatus" class="status-pill">スリープ: OFF</div>
+            <div class="player-card">
+              <div id="playerPlaceholder" class="player-placeholder"><div class="placeholder-mark">▶</div><strong>ASMRを選択してください</strong><span>選んだ作品をここで再生します</span></div>
+              <div id="ytPlayerHost"></div>
             </div>
-          </div>
+
+            <div class="transport-card">
+              <div class="transport-main">
+                <button class="transport-btn" id="prevBtn" title="前へ">⏮</button>
+                <button class="transport-btn main-control" id="playBtn" title="再生 / 一時停止">▶</button>
+                <button class="transport-btn" id="nextBtn" title="次へ">⏭</button>
+              </div>
+              <div class="transport-modes">
+                <button class="mode-btn" id="loopBtn">A-B</button>
+                <button class="mode-btn" id="sleepBtn">スリープ</button>
+              </div>
+            </div>
+
+            <div class="range-card">
+              <div class="progress-row"><span id="timeNow">0:00</span><input id="seek" type="range" min="0" max="1000" value="0" aria-label="再生位置"><span id="timeTotal">0:00</span></div>
+              <div class="player-options">
+                <label><span>音量</span><input id="volume" type="range" min="0" max="100" value="35" aria-label="音量"></label>
+                <div id="loopStatus" class="status-pill">区間リピート: OFF</div>
+                <div id="sleepStatus" class="status-pill">スリープ: OFF</div>
+              </div>
+            </div>
+          </section>
 
           <div class="info-card" id="infoCard">
             <div class="info-empty">ASMRを選ぶと作品情報が表示されます</div>
@@ -104,14 +117,72 @@
 
         <section class="timestamp-panel">
           <div class="timestamp-head">
-            <div><div class="eyebrow">TIMESTAMPS</div><h3>タイムスタンプ <span class="timestamp-count" id="timestampCount">0</span></h3></div>
+            <div><div class="eyebrow">SOUND MAP</div><h3>タイムスタンプ <span class="timestamp-count" id="timestampCount">0</span></h3></div>
             <div class="timestamp-tools"><button class="ghost-btn" id="timestampImportBtn" disabled>コメントから取込</button></div>
           </div>
           <div id="timestampView" class="timestamp-view empty">
-            <div class="empty-copy"><strong>タイムスタンプなし</strong><span>コメント欄のタイムスタンプを貼り付けて登録できます。</span></div>
+            <div class="empty-copy"><strong>タイムスタンプなし</strong><span>コメント欄のタイムスタンプを貼り付けると、音の場所をすぐ探せます。</span></div>
           </div>
         </section>
       </div>
+
+      <section id="settingsPage" class="settings-page" hidden aria-labelledby="settingsPageTitle">
+        <div class="settings-page-inner">
+          <div class="settings-page-head">
+            <div class="settings-page-title">
+              <div class="eyebrow">APP SETTINGS</div>
+              <h2 id="settingsPageTitle">設定</h2>
+              <p>ASMRTubeの色・明るさ・表示密度を、自分が長時間使いやすい状態に合わせます。変更はこのブラウザに保存されます。</p>
+            </div>
+            <button class="settings-back" id="settingsBackBtn" type="button">← 再生画面へ戻る</button>
+          </div>
+
+          <div class="settings-layout">
+            <nav class="settings-section-nav" aria-label="設定カテゴリー">
+              <a href="#settingsAppearance"><span>外観</span><span class="settings-nav-accent"></span></a>
+              <a href="#settingsDisplay"><span>表示</span><span>02</span></a>
+              <a href="#settingsData"><span>データ</span><span>03</span></a>
+            </nav>
+
+            <div class="settings-content">
+              <section class="settings-section" id="settingsAppearance">
+                <div class="settings-section-head"><div class="settings-section-copy"><h3>カラーテーマ</h3><p>Accentだけでなく背景とSurfaceも少しずつ変わります。</p></div><span class="settings-value" id="currentThemeName">Moon Violet</span></div>
+                <div class="theme-grid" role="group" aria-label="カラーテーマ">
+                  <button class="theme-choice theme-violet" type="button" data-theme-choice="violet" aria-pressed="true"><span class="theme-choice-preview"><i class="theme-choice-dot"></i></span><span class="theme-choice-copy"><strong>Moon Violet</strong><span>紫</span></span></button>
+                  <button class="theme-choice theme-rose" type="button" data-theme-choice="rose" aria-pressed="false"><span class="theme-choice-preview"><i class="theme-choice-dot"></i></span><span class="theme-choice-copy"><strong>Soft Rose</strong><span>桃</span></span></button>
+                  <button class="theme-choice theme-ocean" type="button" data-theme-choice="ocean" aria-pressed="false"><span class="theme-choice-preview"><i class="theme-choice-dot"></i></span><span class="theme-choice-copy"><strong>Deep Ocean</strong><span>青</span></span></button>
+                  <button class="theme-choice theme-forest" type="button" data-theme-choice="forest" aria-pressed="false"><span class="theme-choice-preview"><i class="theme-choice-dot"></i></span><span class="theme-choice-copy"><strong>Quiet Forest</strong><span>緑</span></span></button>
+                  <button class="theme-choice theme-amber" type="button" data-theme-choice="amber" aria-pressed="false"><span class="theme-choice-preview"><i class="theme-choice-dot"></i></span><span class="theme-choice-copy"><strong>Warm Lamp</strong><span>橙</span></span></button>
+                  <button class="theme-choice theme-graphite" type="button" data-theme-choice="graphite" aria-pressed="false"><span class="theme-choice-preview"><i class="theme-choice-dot"></i></span><span class="theme-choice-copy"><strong>Graphite</strong><span>無彩色</span></span></button>
+                </div>
+
+                <div class="settings-control" style="margin-top:12px">
+                  <div class="settings-control-row"><div class="settings-control-copy"><strong>画面の明るさ</strong><span>寝る前に画面全体だけを暗くします。動画の音量には影響しません。</span></div><span class="settings-value" id="appearanceBrightnessValue">100%</span></div>
+                  <input class="settings-range" id="appearanceBrightness" type="range" min="30" max="100" step="1" value="100" aria-label="画面の明るさ">
+                  <div class="settings-presets"><button type="button" data-appearance-brightness="100">100%</button><button type="button" data-appearance-brightness="75">75%</button><button type="button" data-appearance-brightness="55">55%</button><button type="button" data-appearance-brightness="35">35%</button></div>
+                </div>
+              </section>
+
+              <section class="settings-section" id="settingsDisplay">
+                <div class="settings-section-head"><div class="settings-section-copy"><h3>表示</h3><p>ライブラリの情報量や動きを調整します。</p></div></div>
+                <div class="settings-control"><div class="settings-control-row"><div class="settings-control-copy"><strong>コンパクト表示</strong><span>左のライブラリを少し詰めて、一度に見える作品数を増やします。</span></div><label class="settings-toggle"><input id="appearanceCompact" type="checkbox"><span class="settings-toggle-track"></span></label></div></div>
+                <div class="settings-control"><div class="settings-control-row"><div class="settings-control-copy"><strong>サムネイル表示</strong><span>ASMR一覧のYouTubeサムネイルを表示します。</span></div><label class="settings-toggle"><input id="appearanceThumbs" type="checkbox" checked><span class="settings-toggle-track"></span></label></div></div>
+                <div class="settings-control"><div class="settings-control-row"><div class="settings-control-copy"><strong>動きを減らす</strong><span>Hoverや画面切替のMotionを最小限にします。</span></div><label class="settings-toggle"><input id="appearanceMotion" type="checkbox"><span class="settings-toggle-track"></span></label></div></div>
+                <div class="settings-control"><div class="settings-control-row"><div class="settings-control-copy"><strong>起動時に概要を表示</strong><span>次回からライブラリ概要を最初に表示します。</span></div><label class="settings-toggle"><input id="appearanceDashboard" type="checkbox"><span class="settings-toggle-track"></span></label></div></div>
+              </section>
+
+              <section class="settings-section" id="settingsData">
+                <div class="settings-section-head"><div class="settings-section-copy"><h3>データとヘルプ</h3><p>バックアップや使い方はここから開けます。</p></div></div>
+                <div class="settings-data-grid">
+                  <div class="settings-data-card"><strong>データ管理</strong><p>JSONバックアップ、ローカルスナップショット、整合性確認を開きます。</p><button type="button" id="settingsDataBtn">データ管理を開く</button></div>
+                  <div class="settings-data-card"><strong>使い方</strong><p>タイムスタンプ取込、ショートカット、データ保護の説明を確認します。</p><button type="button" id="settingsHelpBtnV3">ヘルプを開く</button></div>
+                </div>
+                <div class="settings-storage-note">外観設定は <code>asmrtube.settings.v1</code>、ライブラリは <code>asmrtube.library.v1</code> に分けて保存します。テーマ変更で作品データは書き換えません。</div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -158,10 +229,14 @@
 
   <div id="toast" class="toast"></div>
   <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="app-config.js?v=3.0"></script>
   <script src="app.js?v=3"></script>
   <script src="timestamp-parser.js?v=1.9"></script>
+  <script src="timestamp-ui.js?v=3.0"></script>
+  <script src="ui-enhancements.js?v=3.0"></script>
   <script src="app-quality-v21.js?v=2.1"></script>
   <script src="timestamp-polish-v21.js?v=2.1"></script>
   <script src="library-tools-v22.js?v=2.2"></script>
+  <script src="appearance.js?v=3.0"></script>
 </body>
 </html>
