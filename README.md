@@ -208,14 +208,14 @@ GitHub Actions:
 - timestamp-ui.js接続
 - v2.1 / v2.2 Runtime維持
 
-PR #4の最終Head `f8c289566f5ba42934507ba51a18f0ad7f7fc33f` では、JavaScript / JSON共通BaselineとASMRTube Static Checkが **success** しています。
+PR #4では、JavaScript / JSON共通BaselineとASMRTube Static Checkが **success** しています。
 
 ## 現在の確認状態
 
 - Implemented: Yes
 - Library Schema change: No
 - Existing storage key change: No
-- PR final-head Static Validation: Passed
+- PR Static Validation: Passed
 - Browser / Screenshot visual review: Not verified
 - Mobile real-device: Not verified
 
