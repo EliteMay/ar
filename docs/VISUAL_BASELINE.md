@@ -1,77 +1,169 @@
 # ASMRTube Visual Baseline
 
-## Status
+## Current Status
 
-- Candidate date: 2026-08-31
-- App Version: `2.4.0`
-- Reference direction: `web-project-guide` `VD-001 LyricTube Media Workspace`
-- Reference project: `EliteMay/lyrictube`
-- Validation state: **Implemented / Static validation pending / User visual validation pending**
+- Candidate date: 2026-09-01
+- App Version: `3.0.0`
+- Design Direction: **ASMR Media Deck**
+- Guide: `web-project-guide` v1.11.0
+- Project shape: `STATIC + DATA + MEDIA + TOOL`
+- Validation state: **Implementation in progress / User visual validation pending**
 
-この文書はASMRTube v2.4以降の見た目を比較するためのVisual Referenceです。
+この文書はv3以降のVisual比較基準です。
 
-現時点ではコード上のDirectionを定義した段階であり、ユーザーがGitHub Pages上の実画面を確認するまでは **User Validated** へ昇格しません。
+ユーザーがGitHub Pages上の実画面を確認し、Visual Directionを肯定するまでは **User Validated** へ昇格しません。
 
-## Canonical Visual File
+## Rejected Candidate: v2.4
 
-| Role | Source of Truth |
-|---|---|
-| Media Workspace composition | `workspace.css` |
-| Legacy base / compatibility | `styles.css` / `asmr-overrides.css` / `ui-base-v2.css` / `product-v2.css` |
-| Feature-specific detail styles | `quality-v21.css` / `library-tools-v22.css` |
+v2.4は `VD-001 LyricTube Media Workspace` を強く参考にしたCandidateでした。
 
-`workspace.css` は旧Visual layerより後に読み込み、現在のComposition / Surface / Densityを決めます。
+ユーザー確認結果:
 
-## Visual Invariants
+- 「シンプルになっただけ」と評価
+- 全体評価 **40 / 100**
+- 基礎から考え直す方針へ変更
 
-### 1. Signature layout
+したがってv2.4はVisual Baselineとして採用しません。
 
-Desktopは次の役割分担を基本にします。
+失敗の詳細は `PROJECT_LEARNINGS.md` の `L-002` を正本とします。
+
+## v3 Design Concept
+
+**ASMRを選んだ瞬間、その作品が画面の中心になる個人用Media Deck。**
 
 ```text
 Library rail
-→ Player / current ASMR
-→ Timestamp reading surface
+→ ASMR Media Deck
+→ Sound Map / Timestamps
 ```
 
-- PlayerとTimestampがPrimary surfaceであること。
-- 補助機能を同じVisual weightのCard群へ戻さないこと。
+LyricTubeから再利用するのは「LibraryとMediaと補助情報の役割を明確にする」というHierarchyだけです。
 
-### 2. Sidebar
+ASMRTube固有のIdentityは次で作ります。
 
-- 高密度でもSearch / View / Playlist / Libraryの境界が分かること。
-- Active itemはSurface差 + Accent lineを基本にすること。
-- Accent全面塗りを一覧全体へ増やさないこと。
+- 選択中ASMRのYouTube Artwork
+- Player中心のMedia Deck
+- 音の場所を探すSound Map
+- 寝る前に使いやすいDark theme
+- ユーザー選択可能な複数Palette
 
-### 3. Player / Controls
+## Canonical Visual Files
 
-- PlayerはMediaとして明確に強いSurfaceを維持すること。
-- Transport / Seek / Volume / Item infoはSection / Divider中心にすること。
-- ShadowはPlayerなどElevationが意味を持つ場所に限定すること。
+| Role | Source of Truth |
+|---|---|
+| Theme tokens / palette | `theme.css` |
+| Media Deck / Library / Sound Map composition | `workspace.css` |
+| Dedicated settings page | `settings.css` |
+| Theme / brightness / display behavior | `appearance.js` |
+| Timestamp interaction hierarchy | `timestamp-ui.js` / `timestamp-ui.css` |
+| Legacy compatibility | `styles.css` / `asmr-overrides.css` / `ui-base-v2.css` / `product-v2.css` |
+| Feature-specific compatibility | `quality-v21.css` / `library-tools-v22.css` |
 
-### 4. Timestamp
+v3 Visual Source of TruthはLegacy CSSより後に読み込みます。
 
-- Timestamp panelは一覧CardではなくReading / Navigation surfaceとして扱うこと。
-- Active timestampは内容を読みやすくし、現在位置が分かること。
-- Parent / Chapter表示を装飾で重くしすぎないこと。
+## Visual Invariants
 
-### 5. Effects
+### 1. Media is the focal point
 
-- 背景全体のGradient / Glowを通常Workspaceへ戻さない。
-- 大量のShadow / Rounded CardをHierarchyの代わりに使わない。
-- Typography / Spacing / Divider / Surface差を先に使う。
+- YouTube PlayerがFirst ViewのPrimary contentであること。
+- Player / Transport / Seek / Volumeを別々の無関係なCardへ分裂させないこと。
+- 選択中ArtworkはMedia contextとして使い、本文可読性を妨げる強さにしないこと。
 
-### 6. Responsive
+### 2. Library remains practical
 
-- Desktopを縮めるだけでなく、狭い画面では `Player → Timestamp` の順に再構成する。
-- 主要操作とTimestamp navigationを画面外へ失わない。
+- Search / View / Playlist / Libraryの区別が一目で分かること。
+- サムネイルが視覚的な探索を助けること。
+- Active itemは色だけでなくSurface / Border / Accent lineでも区別すること。
+- Compact modeでもタイトルと配信者を識別できること。
 
-## Change Policy
+### 3. Sound Map is navigation, not decoration
 
-このBaselineから意味のある変更を行う場合は次を確認します。
+- Timestamp panelは目的の音へ移動するためのNavigation surfaceとして扱う。
+- 現在位置、見出し、親子関係が読めること。
+- `見出し / すべて` を正式Runtimeで提供すること。
+- 長いTimestamp一覧でもPlayerより強いVisual weightにしないこと。
 
-1. 主要Taskが改善するか
-2. Player / TimestampのPrimary hierarchyを壊さないか
-3. Storage / Player behavior等の機能仕様をVisual都合で変更していないか
-4. Static validation後、実ブラウザまたはScreenshotで確認したか
-5. ユーザー評価が得られた場合、この文書のValidation stateを更新するか
+### 4. Theme system
+
+最低限次のThemeを選択可能にする。
+
+- Moon Violet
+- Soft Rose
+- Deep Ocean
+- Quiet Forest
+- Warm Lamp
+- Graphite
+
+ThemeはAccentだけでなく、Page background / Sidebar / Surface / Selected stateへ連動する。
+
+Theme変更で `asmrtube.library.v1` を書き換えない。
+
+### 5. Dedicated settings page
+
+設定は主要なProduct機能として独立Pageを持つ。
+
+最低限:
+
+- Color theme
+- Brightness
+- Compact display
+- Thumbnail visibility
+- Reduced motion
+- Start dashboard
+- Data management入口
+- Help入口
+
+### 6. Effects policy
+
+Gradient / Shadow / Blur / Rounded Surfaceを全面禁止しない。
+
+使用目的を限定する。
+
+- Artwork blur: 選択中Media context
+- Player shadow: Primary media surfaceのElevation
+- Accent glow: 局所的なSelected / Focus補助
+- Rounded surface: Media Deck / Settings card等、独立SurfaceのShape language
+
+Hierarchyの代わりにEffectを大量追加しない。
+
+### 7. Responsive
+
+- Desktop: Library + Media Deck + Sound Mapを同時に把握できること。
+- Narrow desktop: Player幅を優先し、Sound Mapを過度に狭くしないこと。
+- Mobile: Sidebar drawer + `Player → Info → Sound Map` の順に再構成すること。
+- 320px級の幅で意図しない全体横スクロールを出さないこと。
+
+## Runtime Invariants
+
+Visual fileが存在するだけで完成扱いしません。
+
+`index.html` から最低限次を正式に読み込むこと。
+
+```text
+app-config.js
+app.js
+timestamp-parser.js
+timestamp-ui.js
+ui-enhancements.js
+app-quality-v21.js
+timestamp-polish-v21.js
+library-tools-v22.js
+appearance.js
+```
+
+`tests/static-check.mjs` でRuntime PathとLoad orderをGuardします。
+
+## Validation Gate
+
+v3をVisual完成扱いするには次が必要です。
+
+1. JavaScript / JSON / Static Validation成功
+2. GitHub Pages deployment成功
+3. First Viewを実ブラウザまたはScreenshotで確認
+4. Player / Library / TimestampのHierarchy確認
+5. 設定ページで複数Themeが切り替わることを確認
+6. Theme変更後のReloadでも設定が残ることを確認
+7. Mobileまたは狭いViewportで主要操作が消えないことを確認
+8. ユーザー評価
+
+現時点でUser visual validationがないため、このBaselineは **Candidate** です。
