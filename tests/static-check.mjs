@@ -47,6 +47,7 @@ const required=[
   'project-meta.json',
   'README.md',
   'PROJECT_LEARNINGS.md',
+  'docs/VISUAL_BASELINE.md',
   '作業報告書.md'
 ];
 for(const file of required)if(!exists(file))fail(`required file is missing: ${file}`);
