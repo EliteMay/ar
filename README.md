@@ -1,8 +1,12 @@
-# ASMRTube v2.2
+# ASMRTube v2.4.0
 
 YouTube上のASMRを自分用に整理・再生し、コメント欄にある多様なタイムスタンプを再利用するための静的Webアプリです。
 
 GitHub Pagesだけで動作し、YouTube Data APIキーは不要です。
+
+- Adopted Guide: `web-project-guide` v1.11.0
+- Profiles: `STATIC + DATA + MEDIA + TOOL`
+- Visual Reference: `VD-001 LyricTube Media Workspace`
 
 ## 目的
 
@@ -27,6 +31,35 @@ GitHub Pagesだけで動作し、YouTube Data APIキーは不要です。
 - LyricTubeの保存データへ干渉しない
 - 旧 `{time,label,group,tags}` タイムスタンプを読める
 - v1.9以降の汎用タイムスタンプ解析を維持
+
+# v2.4 LyricTube Media Workspace
+
+ASMRTubeの見た目を、ユーザー評価済みのLyricTubeのMedia Workspaceを参考に再整理しました。
+
+再利用するのは色や寸法の丸コピーではなく、次のVisual hierarchyです。
+
+```text
+Library rail
+→ Player / current ASMR
+→ Timestamp reading surface
+```
+
+主な変更:
+
+- 左ライブラリを高密度なRailへ整理
+- 選択中項目は大きな紫塗りではなく `surface + 左Accent line` を中心に表示
+- YouTube Playerを画面内で最も強いSurfaceとして維持
+- 再生操作 / シーク / 音量 / 作品情報を同じ強さのCard群にせず、Dividerでつながる操作領域へ変更
+- 右タイムスタンプをLyricTubeのLyricsと同じ考え方のReading Surfaceへ変更
+- 背景の大きなGradient、常時Shadow、過剰なCard chromeを削減
+- Dashboard系UIも巨大Hero / Stat Card感を弱め、通常のWorkspaceと同じVisual languageへ統一
+- MobileではDesktopの単純縮小ではなくPlayer → Timestampの優先順を維持
+
+Visual compositionの正本は `workspace.css` です。
+
+旧 `styles.css / product-v2.css` 等は既存機能との互換レイヤーとして残していますが、現在の見た目は最後に読み込む `workspace.css` が上書きします。
+
+保存Schema / Storage Key / Player / Timestamp parserには変更を入れていません。
 
 # v2.2 ライブラリ機能
 
@@ -179,6 +212,8 @@ ASMR削除後8秒間 `元に戻す` を表示します。
 
 他の自作サイトで改善してきた設計をASMRTube向けに再利用しています。
 
+v2.4では、この時期に追加した機能は維持しつつ、見た目の正本をLyricTube型Media Workspaceへ戻しています。
+
 ### LyricTubeから応用
 
 - スマホドロワー
@@ -327,9 +362,11 @@ GitHub Actionsでmainへのpush / PRごとに自動チェックします。
 - JSONファイルをすべて構文解析
 - `index.html` のローカルCSS / JS参照先が存在するか
 - 主要ファイルが不足していないか
-- `index.html` がv2.2 CSS / JSを読み込んでいるか
+- `app-config.js / project-meta.json / index.html` のVersion整合
+- `workspace.css` が旧Visual layerより後に読み込まれているか
+- v2.2ライブラリ機能CSS / JSが引き続き接続されているか
 
-これにより、今後の変更でJavaScript構文エラーやファイル参照漏れをmainへ残しにくくします。
+これにより、JavaScript構文エラーやファイル参照漏れだけでなく、Visual Source of Truthが外れるRegressionも検出します。
 
 # 設定
 
@@ -388,12 +425,15 @@ Esc         スマホサイドバーを閉じる
 │     └ quality-check.yml
 ├ index.html
 ├ favicon.svg
+├ app-config.js
+├ project-meta.json
 ├ styles.css
 ├ asmr-overrides.css
 ├ ui-base-v2.css
 ├ product-v2.css
 ├ quality-v21.css
 ├ library-tools-v22.css
+├ workspace.css
 ├ app.js
 ├ app-quality-v21.js
 ├ ui-enhancements.js
@@ -402,6 +442,7 @@ Esc         スマホサイドバーを閉じる
 ├ timestamp-ui.js
 ├ timestamp-polish-v21.js
 ├ README.md
+├ PROJECT_LEARNINGS.md
 ├ 作業報告書.md
 ├ .nojekyll
 ├ data/
@@ -414,13 +455,16 @@ Esc         スマホサイドバーを閉じる
 
 役割:
 
+- `app-config.js` — App / Build / Guide / Schema metadataの正本
 - `app.js` — 基本機能
 - `timestamp-parser.js` — 汎用解析
 - `timestamp-ui.js` — 基本タイムスタンプUI
 - `timestamp-polish-v21.js` — 親子 / 副題表示補強
-- `ui-enhancements.js` — v2.0 Product Shell
+- `ui-enhancements.js` — v2.0 Product Shell関連モジュール
 - `app-quality-v21.js` — v2.1安定化・安全性
 - `library-tools-v22.js` — v2.2ライブラリ機能
+- `workspace.css` — v2.4以降のVisual composition Source of Truth
+- `PROJECT_LEARNINGS.md` — 長期的な再発防止 / 成功判断
 - `tests/static-check.mjs` — 静的整合性確認
 
 # GitHub Pages
@@ -440,7 +484,7 @@ https://elitemay.github.io/asmrtube/
 
 # 未確認
 
-- v2.2の実ブラウザでの全操作確認
+- v2.4.0の最終Visualを実ブラウザ / Screenshotで確認すること
 - 続き位置の長時間連続再生時の保存挙動
 - お気に入り区間を多数保存した場合の表示密度
 - 100件以上のタイムスタンプを手動編集する場合の操作感
