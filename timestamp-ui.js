@@ -266,7 +266,7 @@
       else row.label=input.value.trim()||'タイムスタンプ';
       const guess=parser()?.guessTags;
       if(typeof guess==='function')row.tags=guess(row.label,row.group||'',row.subtitle||'');
-    };
+    });
   }
 
   // Replace the legacy app renderer through the classic-script global binding.
