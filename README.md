@@ -1,18 +1,29 @@
 # ASMRTube v3.0.0
 
-YouTube上のASMRを自分用に整理・再生し、コメント欄の多様なタイムスタンプを「音の地図」として使う個人向け静的Webアプリです。
+YouTube上のASMRを自分用に整理・再生し、コメント欄にある多様なタイムスタンプを再利用するための静的Webアプリです。
 
-- GitHub Pagesのみで動作
-- YouTube Data APIキー不要
+GitHub Pagesだけで動作し、YouTube Data APIキーは不要です。
+
 - Adopted Guide: `web-project-guide` v1.11.0
 - Profiles: `STATIC + DATA + MEDIA + TOOL`
-- Schema Version: `1`
+- Visual Direction: `ASMR Media Deck`
+- Visual Status: Candidate / User review pending
 
-## v3 Design Direction — ASMR Media Deck
+## v3で基礎から見直した理由
 
-v2.4はLyricTubeのMedia Workspaceを参考に、装飾やCardを減らす方向へ寄せました。しかしユーザー確認では「シンプルになっただけ」と評価され、Visual完成度は40/100でした。
+v2.4ではLyricTubeのMedia Workspaceを強く参考にし、Gradient / Shadow / Card chromeを減らす方向へ整理しました。
 
-v3ではそのCandidateを採用せず、ASMR固有の使い方からVisualを組み直しています。
+しかし実画面のユーザー評価は **40 / 100** で、主な問題は「シンプルになっただけでASMRTubeとしての魅力が弱い」ことでした。
+
+そのためv2.4を完成Visualとして継続せず、`web-project-guide` v1.11.0のDesign Direction手順へ戻って基礎から再設計しました。
+
+比較した方向:
+
+1. LyricTube型3 Paneをさらに磨く
+2. Playerを上、情報を下へ置くTheater型
+3. Library rail + Media Deck + Sound Map
+
+採用: **3. ASMR Media Deck**
 
 ```text
 Library rail
@@ -20,33 +31,39 @@ Library rail
 → Sound Map / Timestamps
 ```
 
-### Signature
+## v3 Visual
 
-選択中ASMRのYouTubeサムネイルを、Player周辺の弱いAmbient visualとして利用します。
+### Library rail
 
-装飾用のGeneric Gradientではなく、**現在聴いている作品そのもの**をVisual materialにします。
+- YouTubeサムネイルを残し、作品を選ぶ場所として視覚的に機能させる
+- Search / View / Playlist / Libraryを同じ階層に潰さない
+- 選択中作品はAccent line + Surface差で表示
 
-Playerは再生ボタン・A-B・Sleep・Seek・Volumeまで含む1つのMedia Deckとして扱い、右のタイムスタンプは目的の音へ移動する `Sound Map` として扱います。
+### ASMR Media Deck
 
-### Visual Source of Truth
+Player / Transport / Seek / Volumeを別々の箱ではなく、1つの再生Deckとして扱います。
 
-| Role | File |
-|---|---|
-| Color / theme tokens | `theme.css` |
-| Main workspace / media composition | `workspace.css` |
-| Dedicated settings page | `settings.css` |
-| Appearance behavior | `appearance.js` |
-| Timestamp hierarchy / interaction | `timestamp-ui.js` / `timestamp-ui.css` |
+選択したYouTubeサムネイルをPlayer周辺の弱いAmbient visualへ使い、登録作品そのものを見た目の材料にします。
 
-旧 `styles.css / product-v2.css` 等は既存機能との互換レイヤーです。現在の見た目はv3 Visual layerが後から統一します。
+### Sound Map
+
+タイムスタンプは「LyricTubeのLyrics代替」ではなく、長いASMRから聴きたい音を探すNavigationとして扱います。
+
+- 見出し / すべて
+- 親 / 子
+- 再生中Highlight
+- コメントから取込
+- 保存済みタイムスタンプ編集
+
+を維持します。
 
 ## 設定ページ
 
-Sidebarの `設定`、または歯車から独立した設定ページを開きます。
+Sidebar下の `設定` から独立ページを開きます。
 
 ### カラーテーマ
 
-6種類をライブ切替できます。
+6テーマを用意しています。
 
 - Moon Violet — 紫
 - Soft Rose — 桃
@@ -55,9 +72,20 @@ Sidebarの `設定`、または歯車から独立した設定ページを開き�
 - Warm Lamp — 橙
 - Graphite — 無彩色
 
-Accentだけでなく、背景・Sidebar・Surface・選択状態もテーマに合わせて変わります。
+ThemeはAccentだけでなく次へ連動します。
 
-### その他の表示設定
+- Page background
+- Sidebar
+- Surface
+- Selected / Active
+- Player control
+- Range
+- Timestamp
+- Focus state
+
+保存は既存 `asmrtube.settings.v1` に `theme` を追加するだけで、Library dataには影響しません。
+
+### 表示設定
 
 - 明るさ 30〜100%
 - コンパクト表示
@@ -65,132 +93,69 @@ Accentだけでなく、背景・Sidebar・Surface・選択状態もテーマに
 - 動きを減らす
 - 起動時に概要表示
 
-保存先は既存のままです。
-
-```text
-asmrtube.settings.v1
-```
-
-v3ではこの設定Objectへ任意項目 `theme` を追加します。ライブラリデータは書き換えません。
-
 ## 目的
 
 - ASMRをタイトル・配信者・タグ・評価で整理する
-- 長い動画から目的の音へすぐ移動する
-- YouTubeコメント欄のタイムスタンプ記法の違いを吸収する
+- YouTubeコメント欄のタイムスタンプを人ごとの書き方の違いごと吸収する
+- 長いASMRから目的の場面へすぐ移動する
 - 気に入った区間や前回の再生位置を残す
-- 配信者単位でもライブラリを見返す
+- 配信者単位でもライブラリを見返せるようにする
 - 誤削除・壊れたJSON・保存データ破損へ備える
-- 寝る前でも長時間使いやすい画面にする
+- GitHub Pagesで軽く、個人利用しやすい状態を維持する
 
 ## 崩してはいけない仕様
 
 - YouTube IFrame Playerによる再生
 - GitHub Pagesだけで動作する静的構成
 - YouTube Data APIキー不要
-- `asmrtube.library.v1` を維持
-- `asmrtube.settings.v1` を維持
-- `asmrtube.timestamp.view.v1` を維持
+- ライブラリ保存キー `asmrtube.library.v1`
+- 表示設定キー `asmrtube.settings.v1`
+- タイムスタンプ表示キー `asmrtube.timestamp.view.v1`
 - JSON書き出し / 読み込み
 - YouTube動画IDによる重複登録防止
-- LyricTubeの保存データへ干渉しない
+- LyricTube保存データへ干渉しない
 - 旧 `{time,label,group,tags}` タイムスタンプを読める
-- v1.9以降の汎用タイムスタンプ解析を維持
-- `resumeAt / resumeDuration / favoriteSections` 等の既存任意項目を維持
+- v1.9以降の汎用タイムスタンプ解析
+- v2.1の安全性改善
+- v2.2の続きから再生 / お気に入り区間 / 配信者 / タイムスタンプ編集
 
-## 主要機能
+## 保存データ
 
-### ライブラリ
-
-- ASMR追加 / 編集 / 削除
-- YouTubeタイトル・チャンネル名の自動取得
-- お気に入り
-- 最近聴いた
-- 睡眠向け
-- プレイリスト
-- タグ絞り込み
-- タイトル / 配信者 / タグ / タイムスタンプ / お気に入り区間検索
-- 評価
-- 作品ごとの音量
-
-### 再生
-
-- YouTube Player
-- 前 / 再生・一時停止 / 次
-- Seek
-- 音量
-- A-B区間リピート
-- 15 / 30 / 45 / 60 / 90分スリープタイマー
-- 続きから再生
-- 名前付きお気に入り区間
-
-### タイムスタンプ
-
-`timestamp-parser.js` が多様なYouTubeコメント記法を段階的に解析します。
-
-対応例:
+Library:
 
 ```text
-0:00 開始
-3:24 右耳かき
+asmrtube.library.v1
 ```
+
+Settings:
 
 ```text
-[3:24](YouTube URL) 右耳かき
+asmrtube.settings.v1
 ```
+
+Timestamp view:
 
 ```text
-2:41 炭酸  耳ふー 4:46 右 5:38 左
+asmrtube.timestamp.view.v1
 ```
+
+Snapshot:
 
 ```text
-お耳マッサージ
-▷ 04:22 マッサージ開始
-┗ 05:00 さわさわ
+asmrtube.snapshot.v1
+asmrtube.snapshot.beforeRestore.v1
 ```
 
-表示:
+Schema Versionは `1` のままです。
 
-- `見出し / すべて`
-- 見出しカード
-- 親タイムスタンプ
-- 親子表示
-- 現在位置ハイライト
-- Group折りたたみ
-- 保存済みタイムスタンプ編集
+## Runtime
 
-v3では `timestamp-ui.js` を正式Runtimeへ接続し、`renderTimestamps / updateActiveTimestamp / showTimestampPreview` の正本として動作させます。
-
-## データ管理
-
-- JSON書き出し
-- JSON読み込み
-- ローカルスナップショット
-- スナップショット復元
-- ライブラリ診断
-- 削除Undo
-
-保存キー:
-
-```text
-ライブラリ: asmrtube.library.v1
-表示設定: asmrtube.settings.v1
-タイムスタンプ表示: asmrtube.timestamp.view.v1
-簡易スナップショット: asmrtube.snapshot.v1
-復元直前退避: asmrtube.snapshot.beforeRestore.v1
-```
-
-## Runtime構成
-
-v3では「ファイルは存在するが `index.html` から読み込まれていない」状態をRegressionとして扱います。
-
-主要Runtime:
+v3では次を `index.html` から正式に読み込みます。
 
 ```text
 app-config.js
 app.js
 timestamp-parser.js
-timestamp-ui.js
 ui-enhancements.js
 app-quality-v21.js
 timestamp-polish-v21.js
@@ -198,45 +163,60 @@ library-tools-v22.js
 appearance.js
 ```
 
-`tests/static-check.mjs` で存在だけでなく、`index.html` への接続とLoad orderも確認します。
+`timestamp-ui.js` は `timestamp-parser.js` から読み込まれ、`renderTimestamps / updateActiveTimestamp / showTimestampPreview` の正式Rendererへ接続します。
 
-## 自動品質チェック
+v2.4ではRepoに存在していた一部UI Moduleが本番Runtimeから外れていたため、v3のStatic CheckではRuntime接続も検査します。
 
-`.github/workflows/quality-check.yml` で以下を確認します。
-
-- JavaScript構文
-- JSON構文
-- HTMLから参照するローカルファイルの存在
-- Version / Guide / Schema metadata整合
-- v3 Theme / Workspace / Settings CSSの接続順
-- Product Shell / Timestamp UI / Appearance runtimeの接続順
-- 設定ページと複数Themeの存在
-- `asmrtube.settings.v1` の維持
-
-## ショートカット
+## Visual Source of Truth
 
 ```text
-Space / K   再生・一時停止
-J           10秒戻る
-L           10秒進む
-Ctrl + K    検索
-?           ヘルプ
-Esc         スマホサイドバーを閉じる
+theme.css       Color / Surface / Accent tokens
+workspace.css   Library / Media Deck / Sound Map composition
+settings.css    Dedicated settings page
 ```
 
-## GitHub Pages
+旧CSSは互換Layerとして残りますが、v3の見た目は上記を最後に読み込んで決定します。
+
+Visual判断・不採用理由・変更条件は `docs/VISUAL_BASELINE.md` と `PROJECT_LEARNINGS.md` を確認してください。
+
+## 回帰テスト / CI
 
 ```text
-https://elitemay.github.io/asmrtube/
+tests/
+├ timestamp-cases.json
+├ timestamp-parser.test.html
+└ static-check.mjs
 ```
 
-## Visual validation
+GitHub Actions:
 
-v3.0は大規模UI刷新です。
+```text
+.github/workflows/quality-check.yml
+```
 
-- Static / CI: PRと最終main Commitで確認する
-- GitHub Pages deployment: merge後に確認する
-- Browser / Screenshot visual review: **User確認前は未確認扱い**
-- Mobile real-device: **未確認**
+確認対象:
 
-`CIが通った = 見た目が完成した` とは扱いません。v3のVisual Baselineはユーザーが実画面を評価した後に確定します。
+- JavaScript syntax
+- JSON parse
+- index.html local reference
+- App / Guide / Schema Version整合
+- v3 CSS load order
+- settings page存在
+- theme selector 6種類
+- appearance.js接続
+- Product Shell接続
+- timestamp-ui.js接続
+- v2.1 / v2.2 Runtime維持
+
+PR #4の最終Head `f8c289566f5ba42934507ba51a18f0ad7f7fc33f` では、JavaScript / JSON共通BaselineとASMRTube Static Checkが **success** しています。
+
+## 現在の確認状態
+
+- Implemented: Yes
+- Library Schema change: No
+- Existing storage key change: No
+- PR final-head Static Validation: Passed
+- Browser / Screenshot visual review: Not verified
+- Mobile real-device: Not verified
+
+User-facing Visualは、実際のGitHub Pages画面を見てユーザー確認されるまでは完成扱いにしません。
