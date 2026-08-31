@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   baseline:
-    uses: EliteMay/web-project-guide/.github/workflows/reusable-web-baseline.yml@c526f3fc37c89972480b69b249ace017437f6813
+    uses: EliteMay/.github/.github/workflows/reusable-web-baseline.yml@47f58bc690cda0f3aea21c0e65af164a9d6cffdd
     with:
       node-version: '22'
       syntax-paths: '.'
