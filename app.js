@@ -5,10 +5,6 @@ const state={library:[],playlists:[],recent:[],selectedId:null,currentView:'all'
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
 let metadataSeq=0;
 let metadataTimer=null;
-let youtubeApiPromise=null;
-let youtubePlayerPromise=null;
-let playerUiTimer=null;
-let playbackRequestSeq=0;
 
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify({library:state.library,playlists:state.playlists,recent:state.recent}))}
 function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');state.library=Array.isArray(d.library)?d.library:[];state.playlists=Array.isArray(d.playlists)?d.playlists:[];state.recent=Array.isArray(d.recent)?d.recent:[]}catch{toast('保存データを読み込めませんでした')}}
@@ -18,73 +14,13 @@ function canonicalYoutubeUrl(videoId){return `https://www.youtube.com/watch?v=${
 function thumb(id){return id?`https://i.ytimg.com/vi/${id}/hqdefault.jpg`:''}
 function fmt(sec){sec=Math.max(0,Math.floor(Number(sec)||0));const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`}
 function parseTime(t){const p=String(t).trim().split(':').map(Number);if(p.some(Number.isNaN))return null;if(p.length===2)return p[0]*60+p[1];if(p.length===3)return p[0]*3600+p[1]*60+p[2];return null}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function attr(s){return esc(s)}
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
 function ratingLabel(n){return ['未評価','普通','好き','かなり好き','神'][Number(n)||0]}
 function tagList(v){return String(v||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i)}
 function itemById(id){return state.library.find(x=>x.id===id)}
 function allTags(){return [...new Set([...DEFAULT_TAGS,...EAR_TAGS,...state.library.flatMap(x=>x.tags||[])])].sort((a,b)=>a.localeCompare(b,'ja'))}
-
-function setPlayerPlaceholder(title,detail=''){
-  const box=$('#playerPlaceholder');if(!box)return;
-  box.classList.remove('hidden');
-  const strong=box.querySelector('strong'),span=box.querySelector('span');
-  if(strong)strong.textContent=title;
-  if(span)span.textContent=detail;
-}
-function loadYoutubeIframeApi(){
-  if(window.YT?.Player)return Promise.resolve(window.YT);
-  if(youtubeApiPromise)return youtubeApiPromise;
-  youtubeApiPromise=new Promise((resolve,reject)=>{
-    let settled=false;
-    let script=document.querySelector('script[data-asmrtube-youtube-api]');
-    const finish=(ok,value)=>{
-      if(settled)return;settled=true;clearTimeout(timer);
-      if(ok)resolve(value);
-      else{script?.remove();youtubeApiPromise=null;reject(value)}
-    };
-    const timer=setTimeout(()=>finish(false,new Error('YouTube IFrame API timed out')),10000);
-    window.onYouTubeIframeAPIReady=()=>finish(true,window.YT);
-    if(!script){
-      script=document.createElement('script');
-      script.src='https://www.youtube.com/iframe_api';
-      script.async=true;
-      script.dataset.asmrtubeYoutubeApi='1';
-      script.addEventListener('error',()=>finish(false,new Error('YouTube IFrame API failed to load')),{once:true});
-      document.head.appendChild(script);
-    }else{
-      script.addEventListener('error',()=>finish(false,new Error('YouTube IFrame API failed to load')),{once:true});
-    }
-  });
-  return youtubeApiPromise;
-}
-function ensureYoutubePlayer(){
-  if(state.player?.loadVideoById)return Promise.resolve(state.player);
-  if(youtubePlayerPromise)return youtubePlayerPromise;
-  setPlayerPlaceholder('YouTubeプレイヤーを準備中…','YouTubeとの接続に失敗しても、ライブラリや設定はそのまま使えます。');
-  youtubePlayerPromise=loadYoutubeIframeApi().then(()=>new Promise((resolve,reject)=>{
-    let settled=false;
-    const timer=setTimeout(()=>{if(!settled){settled=true;reject(new Error('YouTube player initialization timed out'))}},10000);
-    try{
-      state.player=new YT.Player('ytPlayerHost',{height:'100%',width:'100%',videoId:'',playerVars:{playsinline:1,rel:0},events:{
-        onReady:e=>{
-          if(settled)return;settled=true;clearTimeout(timer);e.target.setVolume(35);
-          if(!playerUiTimer)playerUiTimer=setInterval(updatePlayerUi,400);
-          resolve(state.player);
-        },
-        onStateChange:e=>{const playing=e.data===YT.PlayerState.PLAYING;$('#playBtn').textContent=playing?'❚❚':'▶';if(e.data===YT.PlayerState.ENDED)step(1)},
-        onError:()=>toast('この動画をYouTubeプレイヤーで再生できませんでした')
-      }});
-    }catch(error){clearTimeout(timer);reject(error)}
-  })).catch(error=>{
-    state.player=null;
-    youtubePlayerPromise=null;
-    setPlayerPlaceholder('YouTubeプレイヤーを読み込めませんでした','通信やブロック設定を確認して、再生ボタンでもう一度試してください。');
-    throw error;
-  });
-  return youtubePlayerPromise;
-}
 
 function setMetadataStatus(message,type=''){
   const el=$('#metadataStatus');if(!el)return;
@@ -191,17 +127,14 @@ function currentViewLabel(){
 function selectItem(id,{play=false,start=0}={}){
   const x=itemById(id);if(!x)return;
   state.selectedId=id;
+  $('#playerPlaceholder').classList.add('hidden');
   $('#volume').value=x.volume??35;
   if(state.player){
-    $('#playerPlaceholder').classList.add('hidden');
     state.player.setVolume(x.volume??35);
     if(play){state.player.loadVideoById({videoId:x.videoId,startSeconds:start});markRecent(id)}
     else if(state.currentId!==id){state.player.cueVideoById({videoId:x.videoId,startSeconds:start})}
-    state.currentId=id;
-  }else{
-    setPlayerPlaceholder('再生ボタンでプレイヤーを準備します','YouTubeは再生するときだけ読み込みます。');
-    if(play)playItem(id,start);
   }
+  state.currentId=id;
   renderSongList();renderSelection();
 }
 
@@ -301,23 +234,11 @@ function saveParsedTimestamps(){
 }
 
 function markRecent(id){state.recent=[id,...state.recent.filter(v=>v!==id)].slice(0,50);save();renderCounts()}
-async function playItem(id,start=0){
+function playItem(id,start=0){
   const x=itemById(id);if(!x)return;
-  const request=++playbackRequestSeq;
-  state.selectedId=id;$('#volume').value=x.volume??35;
+  state.selectedId=id;state.currentId=id;markRecent(id);$('#playerPlaceholder').classList.add('hidden');$('#volume').value=x.volume??35;
+  if(state.player?.loadVideoById){state.player.loadVideoById({videoId:x.videoId,startSeconds:start});state.player.setVolume(x.volume??35)}else toast('YouTubeプレイヤーを準備中です');
   renderSongList();renderSelection();
-  try{
-    const player=await ensureYoutubePlayer();
-    if(request!==playbackRequestSeq||state.selectedId!==id)return;
-    state.currentId=id;
-    $('#playerPlaceholder').classList.add('hidden');
-    player.loadVideoById({videoId:x.videoId,startSeconds:start});
-    player.setVolume(x.volume??35);
-    markRecent(id);
-    renderSongList();renderSelection();
-  }catch{
-    if(request===playbackRequestSeq)toast('YouTubeプレイヤーを読み込めませんでした');
-  }
 }
 function queue(){return filtered()}
 function step(dir){const q=queue();if(!q.length)return;let i=q.findIndex(x=>x.id===state.currentId);i=i<0?0:(i+dir+q.length)%q.length;playItem(q[i].id)}
@@ -337,6 +258,11 @@ function addToPlaylistPrompt(id){
 function exportJson(){const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),library:state.library,playlists:state.playlists,recent:state.recent},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`asmrtube_backup_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
 function importJson(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.library))throw 0;state.library=d.library;state.playlists=Array.isArray(d.playlists)?d.playlists:[];state.recent=Array.isArray(d.recent)?d.recent:[];state.selectedId=state.library[0]?.id||null;save();renderAll();if(state.selectedId)selectItem(state.selectedId);toast('バックアップを読み込みました')}catch{toast('対応していないJSONです')}};r.readAsText(file)}
 
+window.onYouTubeIframeAPIReady=()=>{
+  state.player=new YT.Player('ytPlayerHost',{height:'100%',width:'100%',videoId:'',playerVars:{playsinline:1,rel:0},events:{onReady:e=>e.target.setVolume(35),onStateChange:e=>{const playing=e.data===YT.PlayerState.PLAYING;$('#playBtn').textContent=playing?'❚❚':'▶';if(e.data===YT.PlayerState.ENDED)step(1)}}});
+  setInterval(updatePlayerUi,400);
+};
+
 $('#addVideoBtn').onclick=()=>openVideoDialog();$('#topAddBtn').onclick=()=>openVideoDialog();$('#emptyAddBtn').onclick=()=>openVideoDialog();$('#videoForm').onsubmit=saveVideo;
 $('#videoUrl').addEventListener('input',queueMetadataFetch);$('#videoUrl').addEventListener('paste',()=>setTimeout(queueMetadataFetch,0));
 $('#metadataRefreshBtn').onclick=()=>fetchYoutubeMetadata($('#videoUrl').value.trim());
@@ -347,7 +273,7 @@ $$('.view-btn').forEach(b=>b.onclick=()=>{state.currentView=b.dataset.view;state
 $('#timestampImportBtn').onclick=openTimestampDialog;$('#parseTimestampsBtn').onclick=()=>{state.parsedTimestamps=parseTimestampText($('#timestampPaste').value);showTimestampPreview()};$('#saveTimestampsBtn').onclick=saveParsedTimestamps;
 $('#newPlaylistBtn').onclick=()=>{$('#playlistName').value='';$('#playlistDialog').showModal()};$('#playlistForm').onsubmit=e=>{e.preventDefault();const name=$('#playlistName').value.trim();if(!name)return;state.playlists.push({id:uid(),name,items:[]});save();$('#playlistDialog').close();renderPlaylists();toast('プレイリストを作成しました')};
 $('#exportBtn').onclick=exportJson;$('#importInput').onchange=e=>{if(e.target.files[0])importJson(e.target.files[0]);e.target.value=''};
-$('#playBtn').onclick=()=>{const x=itemById(state.selectedId);if(!x)return;if(!state.player||state.currentId!==x.id)return playItem(x.id);const playing=window.YT?.PlayerState&&state.player.getPlayerState()===window.YT.PlayerState.PLAYING;if(playing)state.player.pauseVideo();else state.player.playVideo()};
+$('#playBtn').onclick=()=>{const x=itemById(state.selectedId);if(!x)return;if(state.currentId!==x.id)return playItem(x.id);if(state.player?.getPlayerState()===YT.PlayerState.PLAYING)state.player.pauseVideo();else state.player?.playVideo()};
 $('#prevBtn').onclick=()=>step(-1);$('#nextBtn').onclick=()=>step(1);
 $('#volume').oninput=e=>{state.player?.setVolume(Number(e.target.value));const x=itemById(state.currentId||state.selectedId);if(x){x.volume=Number(e.target.value);save()}};
 $('#seek').oninput=e=>{if(state.duration)state.player?.seekTo(Number(e.target.value)/1000*state.duration,true)};
