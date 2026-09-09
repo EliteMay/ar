@@ -5,6 +5,9 @@ const state={library:[],playlists:[],recent:[],selectedId:null,currentView:'all'
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
 let metadataSeq=0;
 let metadataTimer=null;
+let youtubeApiPromise=null;
+let playerInitPromise=null;
+let playerUiTimer=null;
 
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify({library:state.library,playlists:state.playlists,recent:state.recent}))}
 function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');state.library=Array.isArray(d.library)?d.library:[];state.playlists=Array.isArray(d.playlists)?d.playlists:[];state.recent=Array.isArray(d.recent)?d.recent:[]}catch{toast('保存データを読み込めませんでした')}}
@@ -14,13 +17,103 @@ function canonicalYoutubeUrl(videoId){return `https://www.youtube.com/watch?v=${
 function thumb(id){return id?`https://i.ytimg.com/vi/${id}/hqdefault.jpg`:''}
 function fmt(sec){sec=Math.max(0,Math.floor(Number(sec)||0));const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`}
 function parseTime(t){const p=String(t).trim().split(':').map(Number);if(p.some(Number.isNaN))return null;if(p.length===2)return p[0]*60+p[1];if(p.length===3)return p[0]*3600+p[1]*60+p[2];return null}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
 function attr(s){return esc(s)}
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
 function ratingLabel(n){return ['未評価','普通','好き','かなり好き','神'][Number(n)||0]}
 function tagList(v){return String(v||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i)}
 function itemById(id){return state.library.find(x=>x.id===id)}
 function allTags(){return [...new Set([...DEFAULT_TAGS,...EAR_TAGS,...state.library.flatMap(x=>x.tags||[])])].sort((a,b)=>a.localeCompare(b,'ja'))}
+
+function setPlayerPlaceholder(title,detail=''){
+  const box=$('#playerPlaceholder');if(!box)return;
+  const strong=box.querySelector('strong'),span=box.querySelector('span');
+  if(strong)strong.textContent=title;
+  if(span)span.textContent=detail;
+  box.classList.remove('hidden');
+}
+function hidePlayerPlaceholder(){$('#playerPlaceholder')?.classList.add('hidden')}
+function startPlayerUiTimer(){if(!playerUiTimer)playerUiTimer=setInterval(updatePlayerUi,400)}
+
+function loadYoutubeApi(){
+  if(window.YT?.Player)return Promise.resolve(window.YT);
+  if(youtubeApiPromise)return youtubeApiPromise;
+
+  youtubeApiPromise=new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-asmrtube-youtube-api]');
+    if(existing)existing.remove();
+
+    let settled=false;
+    const finish=(error=null)=>{
+      if(settled)return;
+      settled=true;
+      clearTimeout(timeoutId);
+      if(error)reject(error);else resolve(window.YT);
+    };
+    const timeoutId=setTimeout(()=>finish(new Error('YouTube IFrame API timed out')),12000);
+
+    window.onYouTubeIframeAPIReady=()=>{
+      if(window.YT?.Player)finish();
+      else finish(new Error('YouTube IFrame API is unavailable'));
+    };
+
+    const script=document.createElement('script');
+    script.src='https://www.youtube.com/iframe_api';
+    script.async=true;
+    script.dataset.asmrtubeYoutubeApi='1';
+    script.onerror=()=>finish(new Error('YouTube IFrame API failed to load'));
+    document.head.appendChild(script);
+  }).catch(error=>{
+    youtubeApiPromise=null;
+    document.querySelector('script[data-asmrtube-youtube-api]')?.remove();
+    throw error;
+  });
+
+  return youtubeApiPromise;
+}
+
+async function ensurePlayer(videoId){
+  if(state.player?.loadVideoById)return state.player;
+  if(playerInitPromise)return playerInitPromise;
+
+  setPlayerPlaceholder('YouTubeプレイヤーを準備中です','初回再生時だけYouTubeを読み込みます。');
+  playerInitPromise=loadYoutubeApi().then(()=>new Promise((resolve,reject)=>{
+    let settled=false;
+    const finish=(error,player)=>{
+      if(settled)return;
+      settled=true;
+      clearTimeout(timeoutId);
+      if(error)reject(error);else resolve(player);
+    };
+    const timeoutId=setTimeout(()=>finish(new Error('YouTube player initialization timed out')),12000);
+    try{
+      const player=new window.YT.Player('ytPlayerHost',{
+        height:'100%',width:'100%',videoId:videoId||'',
+        playerVars:{playsinline:1,rel:0},
+        events:{
+          onReady:e=>{
+            state.player=player;
+            e.target.setVolume(Number($('#volume')?.value)||35);
+            startPlayerUiTimer();
+            finish(null,player);
+          },
+          onStateChange:e=>{
+            const playing=e.data===window.YT?.PlayerState?.PLAYING;
+            $('#playBtn').textContent=playing?'❚❚':'▶';
+            if(e.data===window.YT?.PlayerState?.ENDED)step(1);
+          },
+          onError:()=>toast('このYouTube動画を再生できませんでした')
+        }
+      });
+    }catch(error){finish(error)}
+  })).catch(error=>{
+    setPlayerPlaceholder('YouTubeプレイヤーを読み込めませんでした','通信・ブロック設定を確認して、もう一度再生してください。');
+    toast('YouTubeプレイヤーを読み込めませんでした');
+    throw error;
+  }).finally(()=>{playerInitPromise=null});
+
+  return playerInitPromise;
+}
 
 function setMetadataStatus(message,type=''){
   const el=$('#metadataStatus');if(!el)return;
@@ -126,15 +219,18 @@ function currentViewLabel(){
 
 function selectItem(id,{play=false,start=0}={}){
   const x=itemById(id);if(!x)return;
+  if(play)return playItem(id,start);
   state.selectedId=id;
-  $('#playerPlaceholder').classList.add('hidden');
   $('#volume').value=x.volume??35;
   if(state.player){
     state.player.setVolume(x.volume??35);
-    if(play){state.player.loadVideoById({videoId:x.videoId,startSeconds:start});markRecent(id)}
-    else if(state.currentId!==id){state.player.cueVideoById({videoId:x.videoId,startSeconds:start})}
+    if(state.currentId!==id)state.player.cueVideoById({videoId:x.videoId,startSeconds:start});
+    state.currentId=id;
+    hidePlayerPlaceholder();
+  }else{
+    state.currentId=null;
+    setPlayerPlaceholder(x.title,'再生ボタンを押すとYouTubeプレイヤーを読み込みます。');
   }
-  state.currentId=id;
   renderSongList();renderSelection();
 }
 
@@ -203,7 +299,8 @@ async function saveVideo(e){
 function deleteItem(id){
   const x=itemById(id);if(!x||!confirm(`「${x.title}」を削除しますか？`))return;
   state.library=state.library.filter(v=>v.id!==id);state.playlists.forEach(p=>p.items=p.items.filter(v=>v!==id));state.recent=state.recent.filter(v=>v!==id);
-  if(state.selectedId===id)state.selectedId=null;if(state.currentId===id)state.currentId=null;
+  if(state.selectedId===id)state.selectedId=null;
+  if(state.currentId===id){try{state.player?.stopVideo?.()}catch{}state.currentId=null;state.duration=0;$('#timeNow').textContent='0:00';$('#timeTotal').textContent='0:00';$('#seek').value=0;setPlayerPlaceholder('ASMRを選択してください','選んだ作品をここで再生します')}
   save();renderAll();toast('削除しました');
 }
 function toggleFavorite(){const x=itemById(state.selectedId);if(!x)return;x.favorite=!x.favorite;save();renderAll()}
@@ -234,10 +331,19 @@ function saveParsedTimestamps(){
 }
 
 function markRecent(id){state.recent=[id,...state.recent.filter(v=>v!==id)].slice(0,50);save();renderCounts()}
-function playItem(id,start=0){
+async function playItem(id,start=0){
   const x=itemById(id);if(!x)return;
-  state.selectedId=id;state.currentId=id;markRecent(id);$('#playerPlaceholder').classList.add('hidden');$('#volume').value=x.volume??35;
-  if(state.player?.loadVideoById){state.player.loadVideoById({videoId:x.videoId,startSeconds:start});state.player.setVolume(x.volume??35)}else toast('YouTubeプレイヤーを準備中です');
+  state.selectedId=id;
+  $('#volume').value=x.volume??35;
+  renderSongList();renderSelection();
+  try{
+    const player=await ensurePlayer(x.videoId);
+    state.currentId=id;
+    player.loadVideoById({videoId:x.videoId,startSeconds:start});
+    player.setVolume(x.volume??35);
+    hidePlayerPlaceholder();
+    markRecent(id);
+  }catch{return}
   renderSongList();renderSelection();
 }
 function queue(){return filtered()}
@@ -258,11 +364,6 @@ function addToPlaylistPrompt(id){
 function exportJson(){const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),library:state.library,playlists:state.playlists,recent:state.recent},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`asmrtube_backup_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
 function importJson(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.library))throw 0;state.library=d.library;state.playlists=Array.isArray(d.playlists)?d.playlists:[];state.recent=Array.isArray(d.recent)?d.recent:[];state.selectedId=state.library[0]?.id||null;save();renderAll();if(state.selectedId)selectItem(state.selectedId);toast('バックアップを読み込みました')}catch{toast('対応していないJSONです')}};r.readAsText(file)}
 
-window.onYouTubeIframeAPIReady=()=>{
-  state.player=new YT.Player('ytPlayerHost',{height:'100%',width:'100%',videoId:'',playerVars:{playsinline:1,rel:0},events:{onReady:e=>e.target.setVolume(35),onStateChange:e=>{const playing=e.data===YT.PlayerState.PLAYING;$('#playBtn').textContent=playing?'❚❚':'▶';if(e.data===YT.PlayerState.ENDED)step(1)}}});
-  setInterval(updatePlayerUi,400);
-};
-
 $('#addVideoBtn').onclick=()=>openVideoDialog();$('#topAddBtn').onclick=()=>openVideoDialog();$('#emptyAddBtn').onclick=()=>openVideoDialog();$('#videoForm').onsubmit=saveVideo;
 $('#videoUrl').addEventListener('input',queueMetadataFetch);$('#videoUrl').addEventListener('paste',()=>setTimeout(queueMetadataFetch,0));
 $('#metadataRefreshBtn').onclick=()=>fetchYoutubeMetadata($('#videoUrl').value.trim());
@@ -273,12 +374,12 @@ $$('.view-btn').forEach(b=>b.onclick=()=>{state.currentView=b.dataset.view;state
 $('#timestampImportBtn').onclick=openTimestampDialog;$('#parseTimestampsBtn').onclick=()=>{state.parsedTimestamps=parseTimestampText($('#timestampPaste').value);showTimestampPreview()};$('#saveTimestampsBtn').onclick=saveParsedTimestamps;
 $('#newPlaylistBtn').onclick=()=>{$('#playlistName').value='';$('#playlistDialog').showModal()};$('#playlistForm').onsubmit=e=>{e.preventDefault();const name=$('#playlistName').value.trim();if(!name)return;state.playlists.push({id:uid(),name,items:[]});save();$('#playlistDialog').close();renderPlaylists();toast('プレイリストを作成しました')};
 $('#exportBtn').onclick=exportJson;$('#importInput').onchange=e=>{if(e.target.files[0])importJson(e.target.files[0]);e.target.value=''};
-$('#playBtn').onclick=()=>{const x=itemById(state.selectedId);if(!x)return;if(state.currentId!==x.id)return playItem(x.id);if(state.player?.getPlayerState()===YT.PlayerState.PLAYING)state.player.pauseVideo();else state.player?.playVideo()};
+$('#playBtn').onclick=()=>{const x=itemById(state.selectedId);if(!x)return;if(!state.player||state.currentId!==x.id)return playItem(x.id);const playing=state.player.getPlayerState?.()===window.YT?.PlayerState?.PLAYING;if(playing)state.player.pauseVideo();else state.player.playVideo?.()};
 $('#prevBtn').onclick=()=>step(-1);$('#nextBtn').onclick=()=>step(1);
 $('#volume').oninput=e=>{state.player?.setVolume(Number(e.target.value));const x=itemById(state.currentId||state.selectedId);if(x){x.volume=Number(e.target.value);save()}};
 $('#seek').oninput=e=>{if(state.duration)state.player?.seekTo(Number(e.target.value)/1000*state.duration,true)};
-$('#loopBtn').onclick=()=>{if(!state.player||!state.selectedId)return;const t=state.player.getCurrentTime()||0;if(state.loopA==null){state.loopA=t;state.loopB=null;$('#loopBtn').textContent=`A ${fmt(t)}`;$('#loopStatus').textContent=`A: ${fmt(t)} / B: 未設定`;$('#loopStatus').classList.add('active');toast('A地点を設定しました')}else if(state.loopB==null){if(t<=state.loopA)return toast('B地点はAより後にしてください');state.loopB=t;$('#loopBtn').textContent='A-B ON';$('#loopBtn').classList.add('active');$('#loopStatus').textContent=`${fmt(state.loopA)} 〜 ${fmt(state.loopB)}`;toast('区間リピートを開始します')}else{resetLoop();toast('区間リピートを解除しました')}};
+$('#loopBtn').onclick=()=>{if(!state.player||!state.selectedId)return toast('先にASMRを再生してください');const t=state.player.getCurrentTime()||0;if(state.loopA==null){state.loopA=t;state.loopB=null;$('#loopBtn').textContent=`A ${fmt(t)}`;$('#loopStatus').textContent=`A: ${fmt(t)} / B: 未設定`;$('#loopStatus').classList.add('active');toast('A地点を設定しました')}else if(state.loopB==null){if(t<=state.loopA)return toast('B地点はAより後にしてください');state.loopB=t;$('#loopBtn').textContent='A-B ON';$('#loopBtn').classList.add('active');$('#loopStatus').textContent=`${fmt(state.loopA)} 〜 ${fmt(state.loopB)}`;toast('区間リピートを開始します')}else{resetLoop();toast('区間リピートを解除しました')}};
 $('#sleepBtn').onclick=()=>$('#sleepDialog').showModal();
 $$('[data-sleep]').forEach(b=>b.onclick=()=>{clearTimeout(state.sleepTimer);state.sleepTimer=null;const min=Number(b.dataset.sleep);if(min){state.sleepTimer=setTimeout(()=>{state.player?.pauseVideo();$('#sleepStatus').textContent='スリープ: 完了';toast('スリープタイマーで停止しました')},min*60000);$('#sleepStatus').textContent=`スリープ: ${min}分`;$('#sleepStatus').classList.add('active');toast(`${min}分後に停止します`)}else{$('#sleepStatus').textContent='スリープ: OFF';$('#sleepStatus').classList.remove('active');toast('スリープタイマーを解除しました')}});
 
-load();renderAll();if(state.library.length){state.selectedId=state.library[0].id;renderAll()}
+load();renderAll();if(state.library.length){state.selectedId=state.library[0].id;renderAll();setPlayerPlaceholder(state.library[0].title,'再生ボタンを押すとYouTubeプレイヤーを読み込みます。')}
