@@ -59,6 +59,7 @@ for(const file of required)if(!exists(file))fail(`required file is missing: ${fi
 
 const meta=JSON.parse(read('project-meta.json'));
 const configSource=read('app-config.js');
+const appSource=read('app.js');
 const appearanceSource=read('appearance.js');
 const timestampUiSource=read('timestamp-ui.js');
 function configString(key){return configSource.match(new RegExp(`${key}:\\s*['\"]([^'\"]+)['\"]`))?.[1]||null}
@@ -70,8 +71,8 @@ if(configNumber('schemaVersion')!==meta.schemaVersion)fail(`schemaVersion mismat
 if(!html.includes(`<title>ASMRTube v${meta.appVersion}</title>`))fail(`index.html title does not match appVersion ${meta.appVersion}`);
 
 const requiredRuntime=[
-  'app-config.js?v=3.0',
-  'app.js?v=3',
+  'app-config.js?v=3.0.1',
+  'app.js?v=3.0.1',
   'timestamp-parser.js?v=1.9',
   'timestamp-ui.js?v=3.0',
   'ui-enhancements.js?v=3.0',
@@ -109,6 +110,13 @@ if(timestampUiIndex<parserIndex)fail('timestamp-ui.js must load after timestamp-
 if(productShellIndex<timestampUiIndex)fail('ui-enhancements.js must load after canonical timestamp UI');
 if(appearanceIndex<productShellIndex)fail('appearance.js must load after product shell so the settings gear routes to the v3 page');
 
+if(html.includes('<script src="https://www.youtube.com/iframe_api"></script>'))fail('YouTube IFrame API must not block the initial document load');
+if(!appSource.includes("script.src='https://www.youtube.com/iframe_api'"))fail('app.js must own lazy YouTube IFrame API loading');
+if(!appSource.includes("script.dataset.asmrtubeYoutubeApi='1'"))fail('lazy YouTube API script needs a canonical runtime marker');
+if(!appSource.includes('YouTube IFrame API timed out'))fail('YouTube API lazy loader needs a timeout failure path');
+if(!appSource.includes('YouTube player initialization timed out'))fail('YouTube player initialization needs a timeout failure path');
+if(!appSource.includes("setPlayerPlaceholder('YouTubeプレイヤーを読み込めませんでした'"))fail('YouTube player failure must remain visible in the player surface');
+
 if(!html.includes('id="settingsPage"'))fail('dedicated settings page is missing');
 if(!html.includes('id="settingsPageBtn"'))fail('settings page navigation button is missing');
 const themeChoices=[...html.matchAll(/data-theme-choice="([^"]+)"/g)].map(match=>match[1]);
@@ -126,4 +134,4 @@ if(failures.length){
   process.exit(1);
 }
 
-console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, v3 runtime and visual layers connected.`);
+console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, v3 runtime and visual layers connected, YouTube startup isolated.`);
