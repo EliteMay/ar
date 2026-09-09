@@ -4,7 +4,7 @@
 
   const config=Object.freeze({
     appVersion:'3.0.0',
-    build:'20260901-1',
+    build:'20260909-1',
     schemaVersion:1,
     guideVersion:'1.11.0',
     profiles:Object.freeze(['STATIC','DATA','MEDIA','TOOL'])
@@ -21,10 +21,27 @@
     return !!badge;
   }
 
+  function loadReliabilityRuntime(){
+    if(document.querySelector('script[data-asmrtube-youtube-runtime]'))return;
+    const script=document.createElement('script');
+    script.src='youtube-runtime.js?v=3.0.1';
+    script.async=false;
+    script.dataset.asmrtubeYoutubeRuntime='1';
+    script.addEventListener('error',()=>console.error('ASMRTube: youtube-runtime.js failed to load'),{once:true});
+    document.body.appendChild(script);
+  }
+
   window.applyAsmrtubeVersion=applyVersion;
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyVersion,{once:true});
-  else applyVersion();
+  const start=()=>{
+    applyVersion();
+    // app.js is parser-loaded later in index.html. Queue this so the reliability
+    // patch runs only after the base runtime has installed its globals/handlers.
+    setTimeout(loadReliabilityRuntime,0);
+  };
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
 
   const observer=new MutationObserver(()=>{
     if(applyVersion())observer.disconnect();
