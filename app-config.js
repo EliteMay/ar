@@ -3,8 +3,8 @@
   'use strict';
 
   const config=Object.freeze({
-    appVersion:'3.0.0',
-    build:'20260901-1',
+    appVersion:'3.0.1',
+    build:'20260909-1',
     schemaVersion:1,
     guideVersion:'1.11.0',
     profiles:Object.freeze(['STATIC','DATA','MEDIA','TOOL'])
