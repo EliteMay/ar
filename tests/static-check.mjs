@@ -59,6 +59,7 @@ for(const file of required)if(!exists(file))fail(`required file is missing: ${fi
 
 const meta=JSON.parse(read('project-meta.json'));
 const configSource=read('app-config.js');
+const appSource=read('app.js');
 const appearanceSource=read('appearance.js');
 const timestampUiSource=read('timestamp-ui.js');
 function configString(key){return configSource.match(new RegExp(`${key}:\\s*['\"]([^'\"]+)['\"]`))?.[1]||null}
@@ -109,6 +110,12 @@ if(timestampUiIndex<parserIndex)fail('timestamp-ui.js must load after timestamp-
 if(productShellIndex<timestampUiIndex)fail('ui-enhancements.js must load after canonical timestamp UI');
 if(appearanceIndex<productShellIndex)fail('appearance.js must load after product shell so the settings gear routes to the v3 page');
 
+if(html.includes('https://www.youtube.com/iframe_api'))fail('YouTube IFrame API must not be an eager index.html dependency');
+if(!appSource.includes("script.src='https://www.youtube.com/iframe_api'"))fail('app.js must load YouTube IFrame API on demand');
+if(!appSource.includes('function ensureYoutubePlayer()'))fail('app.js must isolate YouTube player initialization');
+if(!appSource.includes("setPlayerPlaceholder('YouTubeプレイヤーを読み込めませんでした'"))fail('YouTube player failure needs an inline recoverable state');
+if(!appSource.includes('if(!playerUiTimer)playerUiTimer=setInterval(updatePlayerUi,400)'))fail('player UI interval must be guarded against duplication');
+
 if(!html.includes('id="settingsPage"'))fail('dedicated settings page is missing');
 if(!html.includes('id="settingsPageBtn"'))fail('settings page navigation button is missing');
 const themeChoices=[...html.matchAll(/data-theme-choice="([^"]+)"/g)].map(match=>match[1]);
@@ -126,4 +133,4 @@ if(failures.length){
   process.exit(1);
 }
 
-console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, v3 runtime and visual layers connected.`);
+console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, v3 runtime, lazy YouTube player and visual layers connected.`);
