@@ -2,6 +2,50 @@
 
 この文書は、日々の変更履歴ではなく、今後のASMRTube修正で再利用価値が高い判断・失敗・成功を残す長期メモです。
 
+## L-003 Startup observerは自分が変更するDOMを監視しない
+
+- **Date:** 2026-09-13
+- **Type:** Reliability / Runtime
+- **Guide candidate:** yes — parser startupとMutationObserverの組み合わせで再発し得る
+
+### Symptom
+
+GitHub Pagesで画面自体は表示されるが、Chromeのタブが読み込み完了にならず、再読み込みやDevTools Consoleの入力も反応しにくい状態が継続した。
+
+Chrome Task ManagerではASMRTubeタブのCPUが100%を大きく超える一方、Networkは0だった。
+
+### Root Cause
+
+`app-config.js` がDocument全体を `childList + subtree` で監視する `MutationObserver` を起動し、Observer callback内の `applyVersion()` が `document.title` を毎回書き換えていた。
+
+`app.js` が初期DOMを更新した時点では `.sidebar-version strong` がまだ作られていないためObserverは解除されず、`document.title` の更新が次のMutationを発生させる自己再発火経路になった。これによりMain ThreadがMutation microtask処理に占有され、後続Scriptのparser進行や通常操作が阻害される可能性があった。
+
+前回のYouTube IFrame API対策はNetwork依存をCritical Pathから外す改善としては有効だったが、このCPU loopは別原因だった。
+
+### Final Fix
+
+- `app-config.js` のDocument-wide `MutationObserver` を削除
+- Version表示は `DOMContentLoaded` 後のone-shot処理に限定
+- YouTube reliability runtimeの遅延読込はそのまま維持
+- Buildを `20260913-1` へ更新
+
+### Regression Guard
+
+`tests/static-check.mjs` で次を検査する。
+
+- `app-config.js` に `new MutationObserver` を再導入しない
+- Startup処理が `DOMContentLoaded` のone-shot経路を維持する
+- YouTube IFrame APIは引き続き初期HTMLへ直結しない
+
+### Prevention
+
+- Startup metadata更新のためにDocument全体を監視しない
+- Observer callbackから、同じObserver対象へ継続的にDOM mutationを発生させない
+- 「タブが読み込み中」の原因調査ではNetwork pendingだけでなくCPU / Main Threadも確認する
+- External dependency仮説で直した後も、実ブラウザ症状が消えたことをCompletion条件にする
+
+---
+
 ## L-002 Media hierarchyとVisual austerityを混同しない
 
 - **Date:** 2026-09-01

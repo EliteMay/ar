@@ -113,6 +113,8 @@ if(appearanceIndex<productShellIndex)fail('appearance.js must load after product
 
 if(html.includes('https://www.youtube.com/iframe_api'))fail('YouTube IFrame API must not be an eager index.html dependency');
 if(!configSource.includes("script.src='youtube-runtime.js?v=3.0.1'"))fail('app-config.js must defer the YouTube reliability runtime until app startup completes');
+if(configSource.includes('new MutationObserver'))fail('app-config.js must not use a DOM MutationObserver during parser startup; version application must be one-shot');
+if(!configSource.includes("document.addEventListener('DOMContentLoaded',start,{once:true})"))fail('app-config.js must wait for DOMContentLoaded before startup wiring');
 if(!runtimeSource.includes("script.src='https://www.youtube.com/iframe_api'"))fail('youtube-runtime.js must load YouTube IFrame API on demand');
 if(!runtimeSource.includes('function ensurePlayer()'))fail('youtube-runtime.js must isolate YouTube player initialization');
 if(!runtimeSource.includes("showPlayerStatus('YouTubeプレイヤーを読み込めませんでした'"))fail('YouTube player failure needs an inline recoverable state');
@@ -136,4 +138,4 @@ if(failures.length){
   process.exit(1);
 }
 
-console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, deferred YouTube runtime and v3 visual layers connected.`);
+console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, startup observer guard, deferred YouTube runtime and v3 visual layers connected.`);
