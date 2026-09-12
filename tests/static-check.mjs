@@ -72,7 +72,7 @@ if(configNumber('schemaVersion')!==meta.schemaVersion)fail(`schemaVersion mismat
 if(!html.includes(`<title>ASMRTube v${meta.appVersion}</title>`))fail(`index.html title does not match appVersion ${meta.appVersion}`);
 
 const requiredRuntime=[
-  'app-config.js?v=3.0',
+  'app-config.js?v=20260913-1',
   'app.js?v=3',
   'timestamp-parser.js?v=1.9',
   'timestamp-ui.js?v=3.0',
