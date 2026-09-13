@@ -3,13 +3,12 @@ import path from 'node:path';
 
 const root=path.resolve(process.cwd());
 const failures=[];
-
-function fail(message){failures.push(message)}
-function exists(relative){return fs.existsSync(path.join(root,relative))}
-function read(relative){return fs.readFileSync(path.join(root,relative),'utf8')}
+const fail=message=>failures.push(message);
+const exists=relative=>fs.existsSync(path.join(root,relative));
+const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
 
 const html=read('index.html');
-const refs=[...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(m=>m[1]);
+const refs=[...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(match=>match[1]);
 for(const ref of refs){
   if(/^(?:https?:|data:|#)/i.test(ref))continue;
   const clean=ref.split(/[?#]/)[0].replace(/^\.\//,'');
@@ -22,120 +21,69 @@ function walk(dir){
     const full=path.join(dir,entry.name);
     if(entry.isDirectory())walk(full);
     else if(entry.name.endsWith('.json')){
-      try{JSON.parse(fs.readFileSync(full,'utf8'))}
-      catch(error){fail(`invalid JSON: ${path.relative(root,full)} (${error.message})`)}
+      try{JSON.parse(fs.readFileSync(full,'utf8'))}catch(error){fail(`invalid JSON: ${path.relative(root,full)} (${error.message})`)}
     }
   }
 }
 walk(root);
 
 const required=[
-  'app-config.js',
-  'app.js',
-  'youtube-runtime.js',
-  'app-quality-v21.js',
-  'ui-enhancements.js',
-  'appearance.js',
-  'library-tools-v22.js',
-  'timestamp-parser.js',
-  'timestamp-ui.js',
-  'timestamp-polish-v21.js',
-  'styles.css',
-  'asmr-overrides.css',
-  'ui-base-v2.css',
-  'product-v2.css',
-  'timestamp-ui.css',
-  'quality-v21.css',
-  'library-tools-v22.css',
-  'theme.css',
-  'workspace.css',
-  'settings.css',
-  'project-meta.json',
-  'README.md',
-  'PROJECT_LEARNINGS.md',
-  'docs/VISUAL_BASELINE.md',
-  '作業報告書.md'
+  'app-config.js','diagnostics.js','core-utils.js','timestamp-parser.js','app.js','youtube-runtime.js','timestamp-ui.js','ui-enhancements.js','library-tools.js','appearance.js',
+  'styles.css','asmr-overrides.css','ui-base-v2.css','product-v2.css','timestamp-ui.css','quality.css','library-tools.css','theme.css','workspace.css','settings.css',
+  'project-meta.json','README.md','PROJECT_LEARNINGS.md','docs/VISUAL_BASELINE.md','作業報告書.md',
+  'tests/static-check.mjs','tests/core-utils.test.mjs','tests/timestamp-parser.test.mjs','tests/browser-smoke.html'
 ];
 for(const file of required)if(!exists(file))fail(`required file is missing: ${file}`);
+const retired=['app-quality-v21.js','timestamp-polish-v21.js','library-tools-v22.js','quality-v21.css','library-tools-v22.css'];
+for(const file of retired)if(exists(file))fail(`retired patch runtime must be removed: ${file}`);
 
 const meta=JSON.parse(read('project-meta.json'));
-const configSource=read('app-config.js');
-const runtimeSource=read('youtube-runtime.js');
-const appearanceSource=read('appearance.js');
-const timestampUiSource=read('timestamp-ui.js');
-function configString(key){return configSource.match(new RegExp(`${key}:\\s*['\"]([^'\"]+)['\"]`))?.[1]||null}
-function configNumber(key){const value=configSource.match(new RegExp(`${key}:\\s*(\\d+)`))?.[1];return value==null?null:Number(value)}
+const config=read('app-config.js'),app=read('app.js'),runtime=read('youtube-runtime.js'),appearance=read('appearance.js'),shell=read('ui-enhancements.js'),core=read('core-utils.js'),diagnostics=read('diagnostics.js'),timestampUi=read('timestamp-ui.js');
+const configString=key=>config.match(new RegExp(`${key}:\\s*['\"]([^'\"]+)['\"]`))?.[1]||null;
+const configNumber=key=>{const value=config.match(new RegExp(`${key}:\\s*(\\d+)`))?.[1];return value==null?null:Number(value)};
+if(configString('appVersion')!==meta.appVersion)fail(`appVersion mismatch: config=${configString('appVersion')} meta=${meta.appVersion}`);
+if(configString('guideVersion')!==meta.guideVersion)fail(`guideVersion mismatch: config=${configString('guideVersion')} meta=${meta.guideVersion}`);
+if(configNumber('schemaVersion')!==meta.schemaVersion)fail(`schemaVersion mismatch: config=${configNumber('schemaVersion')} meta=${meta.schemaVersion}`);
+if(!html.includes('<title>ASMRTube</title>'))fail('index.html must not hardcode the app version in the title');
+if(/ASMRTube v2\.[0-9]/.test([app,runtime,appearance,shell].join('\n')))fail('active runtime still contains a legacy v2 display version');
 
-if(configString('appVersion')!==meta.appVersion)fail(`appVersion mismatch: app-config.js=${configString('appVersion')} project-meta.json=${meta.appVersion}`);
-if(configString('guideVersion')!==meta.guideVersion)fail(`guideVersion mismatch: app-config.js=${configString('guideVersion')} project-meta.json=${meta.guideVersion}`);
-if(configNumber('schemaVersion')!==meta.schemaVersion)fail(`schemaVersion mismatch: app-config.js=${configNumber('schemaVersion')} project-meta.json=${meta.schemaVersion}`);
-if(!html.includes(`<title>ASMRTube v${meta.appVersion}</title>`))fail(`index.html title does not match appVersion ${meta.appVersion}`);
+const scripts=['app-config.js','diagnostics.js','core-utils.js','timestamp-parser.js','app.js','youtube-runtime.js','timestamp-ui.js','ui-enhancements.js','library-tools.js','appearance.js'];
+for(const script of scripts)if(!html.includes(`<script src="${script}"></script>`))fail(`canonical runtime is not connected: ${script}`);
+for(let i=1;i<scripts.length;i++)if(html.indexOf(scripts[i])<html.indexOf(scripts[i-1]))fail(`runtime order is wrong: ${scripts[i-1]} must load before ${scripts[i]}`);
+for(const ref of refs.filter(value=>!value.startsWith('http')))if(/[?&](?:v|b)=/i.test(ref))fail(`local runtime must not use manually maintained cache-busting versions: ${ref}`);
 
-const requiredRuntime=[
-  'app-config.js?v=20260913-1',
-  'app.js?v=3',
-  'timestamp-parser.js?v=1.9',
-  'timestamp-ui.js?v=3.0',
-  'ui-enhancements.js?v=3.0',
-  'app-quality-v21.js?v=2.1',
-  'timestamp-polish-v21.js?v=2.1',
-  'library-tools-v22.js?v=2.2',
-  'appearance.js?v=3.0'
-];
-for(const ref of requiredRuntime)if(!html.includes(ref))fail(`required runtime is not connected: ${ref}`);
+for(const css of ['quality.css','library-tools.css','theme.css','workspace.css','settings.css'])if(!html.includes(`href="${css}"`))fail(`canonical visual layer is not connected: ${css}`);
+if(html.indexOf('theme.css')<html.indexOf('library-tools.css'))fail('theme.css must load after compatibility/product/library CSS');
+if(html.indexOf('workspace.css')<html.indexOf('theme.css'))fail('workspace.css must load after theme.css');
+if(html.indexOf('settings.css')<html.indexOf('workspace.css'))fail('settings.css must load after workspace.css');
 
-const requiredVisual=[
-  'timestamp-ui.css?v=3.0',
-  'library-tools-v22.css?v=2.2',
-  'theme.css?v=3.0',
-  'workspace.css?v=3.0',
-  'settings.css?v=3.0'
-];
-for(const ref of requiredVisual)if(!html.includes(ref))fail(`required visual layer is not connected: ${ref}`);
+if(config.includes('MutationObserver'))fail('app-config.js must remain one-shot and observer-free');
+if(config.includes('createElement(\'script\')')||config.includes('youtube-runtime.js'))fail('app-config.js must own metadata only, not runtime loading');
+if(appearance.includes('MutationObserver')||shell.includes('MutationObserver'))fail('first-party UI must use explicit events instead of MutationObserver patching');
+if(runtime.includes('selectItem=function')||runtime.includes('playItem=async function')||runtime.includes('const baseSelectItem'))fail('YouTube runtime must be an adapter, not a monkey patch');
+if(!runtime.includes("script.src='https://www.youtube.com/iframe_api'"))fail('YouTube external API must remain on-demand');
+if(html.includes('https://www.youtube.com/iframe_api'))fail('index.html must not eagerly load YouTube iframe API');
+if(!app.includes('window.asmrtubeYoutubeRuntime?.selectItem?.'))fail('app selection must delegate to the YouTube adapter');
+if(!app.includes('runtime.playItem(item,start)'))fail('app playback must delegate to the YouTube adapter');
 
-const indexOf=value=>html.indexOf(value);
-const productIndex=indexOf('product-v2.css');
-const libraryCssIndex=indexOf('library-tools-v22.css');
-const themeIndex=indexOf('theme.css?v=3.0');
-const workspaceIndex=indexOf('workspace.css?v=3.0');
-const settingsCssIndex=indexOf('settings.css?v=3.0');
-if(themeIndex<0||themeIndex<productIndex||themeIndex<libraryCssIndex)fail('theme.css must load after legacy/product/library CSS');
-if(workspaceIndex<themeIndex)fail('workspace.css must load after theme.css');
-if(settingsCssIndex<workspaceIndex)fail('settings.css must load after workspace.css');
+if(!app.includes('window.ASMRTubeTimestampParser'))fail('app import flow must use the canonical timestamp parser');
+if(/function parseTimestampText\(text\)\{\s*const out=\[\]/.test(app))fail('legacy duplicate timestamp parser remains in app.js');
+if(!timestampUi.includes('window.renderTimestamps=renderTimestampsV3'))fail('timestamp-ui must own the canonical renderer');
+if(!core.includes('function prepareImportedData'))fail('validated import normalization is missing');
+if(!core.includes("host==='youtube.com'||host.endsWith('.youtube.com')"))fail('strict YouTube host validation is missing');
+if(!app.includes('ASMRTubeCore.prepareImportedData'))fail('JSON import is not routed through validated normalization');
+if(!app.includes('if(file.size>5*1024*1024)'))fail('JSON import file-size guard is missing');
 
-const parserIndex=indexOf('timestamp-parser.js?v=1.9');
-const timestampUiIndex=indexOf('timestamp-ui.js?v=3.0');
-const productShellIndex=indexOf('ui-enhancements.js?v=3.0');
-const appearanceIndex=indexOf('appearance.js?v=3.0');
-if(timestampUiIndex<parserIndex)fail('timestamp-ui.js must load after timestamp-parser.js');
-if(productShellIndex<timestampUiIndex)fail('ui-enhancements.js must load after canonical timestamp UI');
-if(appearanceIndex<productShellIndex)fail('appearance.js must load after product shell so the settings gear routes to the v3 page');
+if(!app.includes("asmrtube:save-failed")||!app.includes('restoreDurableState()'))fail('save failure rollback/feedback is missing');
+if(!app.includes('scheduleVolumeSave()')||!app.includes('flushVolumeSave()'))fail('volume persistence must be debounced and flushed');
+if(!app.includes('invalidateItem?.(editId)'))fail('changing a video URL must invalidate loaded player state');
+if(!app.includes("element.closest('button,a,input,textarea,select"))fail('playback shortcuts must ignore focused interactive controls');
+if(!app.includes('function thumbnailsEnabled()')||!app.includes("showThumbs!==false"))fail('thumbnail suppression must avoid creating image requests, including first render');
+if(!shell.includes('PRE_RESTORE_KEY')||!shell.includes('snapshotUndoRestoreBtn'))fail('pre-restore recovery UI is missing');
+if(!shell.includes('renderSelection()'))fail('dashboard exit must restore canonical topbar selection');
 
-if(html.includes('https://www.youtube.com/iframe_api'))fail('YouTube IFrame API must not be an eager index.html dependency');
-if(!configSource.includes("script.src='youtube-runtime.js?v=3.0.1'"))fail('app-config.js must defer the YouTube reliability runtime until app startup completes');
-if(configSource.includes('new MutationObserver'))fail('app-config.js must not use a DOM MutationObserver during parser startup; version application must be one-shot');
-if(!configSource.includes("document.addEventListener('DOMContentLoaded',start,{once:true})"))fail('app-config.js must wait for DOMContentLoaded before startup wiring');
-if(!runtimeSource.includes("script.src='https://www.youtube.com/iframe_api'"))fail('youtube-runtime.js must load YouTube IFrame API on demand');
-if(!runtimeSource.includes('function ensurePlayer()'))fail('youtube-runtime.js must isolate YouTube player initialization');
-if(!runtimeSource.includes("showPlayerStatus('YouTubeプレイヤーを読み込めませんでした'"))fail('YouTube player failure needs an inline recoverable state');
-if(!runtimeSource.includes('if(!uiTimer)uiTimer=setInterval(updatePlayerUi,400)'))fail('player UI interval must be guarded against duplication');
-if(!runtimeSource.includes('playItem=async function'))fail('playback must be routed through the lazy player runtime');
+if(!diagnostics.includes('MAX_EVENTS=120')||!diagnostics.includes("unhandledrejection"))fail('bounded runtime diagnostics/error capture is missing');
+if(!diagnostics.includes('asmrtube.diagnostics.v1'))fail('diagnostics storage key is missing');
 
-if(!html.includes('id="settingsPage"'))fail('dedicated settings page is missing');
-if(!html.includes('id="settingsPageBtn"'))fail('settings page navigation button is missing');
-const themeChoices=[...html.matchAll(/data-theme-choice="([^"]+)"/g)].map(match=>match[1]);
-if(themeChoices.length<5)fail(`settings page needs multiple color themes; found ${themeChoices.length}`);
-if(new Set(themeChoices).size!==themeChoices.length)fail('theme choices contain duplicate ids');
-
-if(!appearanceSource.includes("const SETTINGS_KEY='asmrtube.settings.v1'"))fail('appearance settings must keep asmrtube.settings.v1');
-if(!appearanceSource.includes("theme:'violet'"))fail('appearance defaults must include a theme');
-if(!timestampUiSource.includes('window.renderTimestamps=renderTimestampsV3'))fail('canonical timestamp UI is not connected to global renderTimestamps');
-if(!timestampUiSource.includes('window.updateActiveTimestamp=updateActive'))fail('canonical timestamp UI is not connected to player highlighting');
-
-if(failures.length){
-  console.error('\nASMRTube static check failed:\n');
-  failures.forEach(message=>console.error(`- ${message}`));
-  process.exit(1);
-}
-
-console.log(`ASMRTube static check passed: ${refs.length} HTML references checked, JSON parsed, metadata aligned, startup observer guard, deferred YouTube runtime and v3 visual layers connected.`);
+if(failures.length){console.error('\nASMRTube static check failed:\n');failures.forEach(message=>console.error(`- ${message}`));process.exit(1)}
+console.log(`ASMRTube static check passed: ${refs.length} references, canonical runtime ownership, parser/import/storage/security/recovery guards and diagnostics verified.`);
