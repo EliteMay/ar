@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>ASMRTube browser smoke</title></head>
+<body data-status="RUNNING"><pre id="result">RUNNING</pre>
+<script>
+(async()=>{
+  const result=document.querySelector('#result');
+  const key='asmrtube.library.v1',settingsKey='asmrtube.settings.v1';
+  const before=localStorage.getItem(key),beforeSettings=localStorage.getItem(settingsKey);
+  const fail=message=>{document.body.dataset.status='FAIL';result.textContent=`FAIL: ${message}`;throw new Error(message)};
+  const assert=(condition,message)=>{if(!condition)fail(message)};
+  try{
+    localStorage.setItem(key,JSON.stringify({library:[{id:'smoke-item',url:'https://www.youtube.com/watch?v=abcdefghijk',videoId:'abcdefghijk',title:'Smoke ASMR',creator:'Tester',tags:['耳かき'],rating:2,volume:35,favorite:false,sleepFriendly:false,timestamps:[],createdAt:1700000000000}],playlists:[],recent:[]}));
+    localStorage.setItem(settingsKey,JSON.stringify({theme:'violet',brightness:100,compact:false,showThumbs:false,reduceMotion:true,startDashboard:false}));
+    const frame=document.createElement('iframe');frame.src='../index.html?smoke=1';frame.style.width='1200px';frame.style.height='800px';document.body.appendChild(frame);
+    await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('app load timeout')),6000);frame.onload=()=>{clearTimeout(timer);setTimeout(resolve,500)}});
+    const w=frame.contentWindow,d=frame.contentDocument;
+    assert(d.querySelector('.song-item'),'library item did not render');
+    d.querySelector('.song-item').click();
+    assert(d.querySelector('#nowTitle')?.textContent==='Smoke ASMR','selection did not update topbar');
+
+    d.querySelector('#settingsPageBtn').click();
+    assert(d.body.classList.contains('settings-mode'),'settings page did not open');
+    d.querySelector('#settingsBackBtn').click();
+    assert(!d.body.classList.contains('settings-mode'),'settings page did not close');
+
+    d.querySelector('#timestampImportBtn').click();
+    const paste=d.querySelector('#timestampPaste');paste.value='▷ 0:10 親\n└ 0:20 子';
+    d.querySelector('#parseTimestampsBtn').click();
+    await new Promise(r=>setTimeout(r,50));
+    assert(d.querySelectorAll('#timestampPreview .preview-grouped-row').length===2,'canonical timestamp parser is not wired to import UI');
+    assert(w.getTimestampParseStats?.().parents===1,'parser parent role was not detected');
+    d.querySelector('#timestampDialog').close();
+
+    d.querySelector('#dashboardBtn').click();
+    assert(d.querySelector('#nowTitle')?.textContent==='ライブラリ概要','dashboard did not open');
+    d.querySelector('.view-btn[data-view="all"]').click();
+    assert(d.querySelector('#nowTitle')?.textContent==='Smoke ASMR','dashboard exit did not restore topbar');
+
+    assert(!d.querySelector('.song-item .thumb img'),'hidden thumbnails still create image requests');
+
+    const button=d.querySelector('#filterBtn');button.focus();
+    const beforeText=d.querySelector('#playBtn').textContent;
+    button.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true,cancelable:true}));
+    assert(d.querySelector('#playBtn').textContent===beforeText,'Space on focused button was stolen by playback shortcut');
+
+    document.body.dataset.status='PASS';result.textContent='PASS';
+  }finally{
+    if(before==null)localStorage.removeItem(key);else localStorage.setItem(key,before);
+    if(beforeSettings==null)localStorage.removeItem(settingsKey);else localStorage.setItem(settingsKey,beforeSettings);
+  }
+})().catch(error=>{if(document.body.dataset.status!=='FAIL'){document.body.dataset.status='FAIL';document.querySelector('#result').textContent=`FAIL: ${error.message}`}});
+</script>
+</body></html>
