@@ -1,4 +1,4 @@
-# ASMRTube v3.0.0
+# ASMRTube v3.0.1
 
 YouTube上のASMRを自分用に整理・再生し、コメント欄にある多様なタイムスタンプを再利用するための静的Webアプリです。
 
@@ -9,21 +9,7 @@ GitHub Pagesだけで動作し、YouTube Data APIキーは不要です。
 - Visual Direction: `ASMR Media Deck`
 - Visual Status: Candidate / User review pending
 
-## v3で基礎から見直した理由
-
-v2.4ではLyricTubeのMedia Workspaceを強く参考にし、Gradient / Shadow / Card chromeを減らす方向へ整理しました。
-
-しかし実画面のユーザー評価は **40 / 100** で、主な問題は「シンプルになっただけでASMRTubeとしての魅力が弱い」ことでした。
-
-そのためv2.4を完成Visualとして継続せず、`web-project-guide` v1.11.0のDesign Direction手順へ戻って基礎から再設計しました。
-
-比較した方向:
-
-1. LyricTube型3 Paneをさらに磨く
-2. Playerを上、情報を下へ置くTheater型
-3. Library rail + Media Deck + Sound Map
-
-採用: **3. ASMR Media Deck**
+## v3 Visual
 
 ```text
 Library rail
@@ -31,23 +17,21 @@ Library rail
 → Sound Map / Timestamps
 ```
 
-## v3 Visual
-
 ### Library rail
 
-- YouTubeサムネイルを残し、作品を選ぶ場所として視覚的に機能させる
-- Search / View / Playlist / Libraryを同じ階層に潰さない
+- YouTube作品をタイトル・配信者・タグ・評価で整理
+- Search / View / Playlist / Libraryを分けて表示
 - 選択中作品はAccent line + Surface差で表示
+- 「サムネイル非表示」時は画像要素自体を生成せず、不要な画像通信を避ける
 
 ### ASMR Media Deck
 
-Player / Transport / Seek / Volumeを別々の箱ではなく、1つの再生Deckとして扱います。
-
-選択したYouTubeサムネイルをPlayer周辺の弱いAmbient visualへ使い、登録作品そのものを見た目の材料にします。
+Player / Transport / Seek / Volumeを1つの再生Deckとして扱います。
+YouTube IFrame APIは初期表示では読み込まず、実際に再生を要求したときだけ読み込みます。
 
 ### Sound Map
 
-タイムスタンプは「LyricTubeのLyrics代替」ではなく、長いASMRから聴きたい音を探すNavigationとして扱います。
+タイムスタンプは長いASMRから聴きたい音を探すNavigationとして扱います。
 
 - 見出し / すべて
 - 親 / 子
@@ -55,35 +39,22 @@ Player / Transport / Seek / Volumeを別々の箱ではなく、1つの再生Dec
 - コメントから取込
 - 保存済みタイムスタンプ編集
 
-を維持します。
+コメント取込は `timestamp-parser.js` の単一Parserを正式経路として使います。
 
-## 設定ページ
+## 設定
 
 Sidebar下の `設定` から独立ページを開きます。
 
 ### カラーテーマ
 
-6テーマを用意しています。
+- Moon Violet
+- Soft Rose
+- Deep Ocean
+- Quiet Forest
+- Warm Lamp
+- Graphite
 
-- Moon Violet — 紫
-- Soft Rose — 桃
-- Deep Ocean — 青
-- Quiet Forest — 緑
-- Warm Lamp — 橙
-- Graphite — 無彩色
-
-ThemeはAccentだけでなく次へ連動します。
-
-- Page background
-- Sidebar
-- Surface
-- Selected / Active
-- Player control
-- Range
-- Timestamp
-- Focus state
-
-保存は既存 `asmrtube.settings.v1` に `theme` を追加するだけで、Library dataには影響しません。
+ThemeはBackground / Surface / Selected state / Player control / Range / Timestamp / Focus stateへ連動します。
 
 ### 表示設定
 
@@ -92,6 +63,8 @@ ThemeはAccentだけでなく次へ連動します。
 - サムネイル表示 / 非表示
 - 動きを減らす
 - 起動時に概要表示
+
+設定は `asmrtube.settings.v1` に保存し、Library dataとは分離します。
 
 ## 目的
 
@@ -116,56 +89,81 @@ ThemeはAccentだけでなく次へ連動します。
 - LyricTube保存データへ干渉しない
 - 旧 `{time,label,group,tags}` タイムスタンプを読める
 - v1.9以降の汎用タイムスタンプ解析
-- v2.1の安全性改善
-- v2.2の続きから再生 / お気に入り区間 / 配信者 / タイムスタンプ編集
+- 続きから再生 / お気に入り区間 / 配信者 / タイムスタンプ編集
 
 ## 保存データ
 
-Library:
-
 ```text
-asmrtube.library.v1
-```
-
-Settings:
-
-```text
-asmrtube.settings.v1
-```
-
-Timestamp view:
-
-```text
-asmrtube.timestamp.view.v1
-```
-
-Snapshot:
-
-```text
-asmrtube.snapshot.v1
-asmrtube.snapshot.beforeRestore.v1
+Library:        asmrtube.library.v1
+Settings:       asmrtube.settings.v1
+Timestamp view: asmrtube.timestamp.view.v1
+Snapshot:       asmrtube.snapshot.v1
+Before restore: asmrtube.snapshot.beforeRestore.v1
+Diagnostics:    asmrtube.diagnostics.v1
 ```
 
 Schema Versionは `1` のままです。
 
+Runtime Diagnosticsはローカル専用で、直近120イベントまでを保持します。入力本文、Cookie、Token、認証情報は記録対象にしません。
+
 ## Runtime
 
-v3では次を `index.html` から正式に読み込みます。
+正式RuntimeはVersion付きPatchを重ねず、次の安定Pathを `index.html` から読み込みます。
 
 ```text
-app-config.js
-app.js
-timestamp-parser.js
-ui-enhancements.js
-app-quality-v21.js
-timestamp-polish-v21.js
-library-tools-v22.js
-appearance.js
+app-config.js        Version / Build / Schema metadata
+diagnostics.js       Local bounded diagnostics
+core-utils.js        YouTube URL / Import validation
+timestamp-parser.js  Canonical timestamp parser
+app.js               Application state / library UI
+youtube-runtime.js   YouTube provider adapter
+timestamp-ui.js      Canonical Sound Map renderer
+ui-enhancements.js   Help / Data recovery / Dashboard / Mobile shell
+library-tools.js     Resume / favorite sections / creator / timestamp editor
+appearance.js        Theme / display settings / media ambience
 ```
 
-`timestamp-ui.js` は `timestamp-parser.js` から読み込まれ、`renderTimestamps / updateActiveTimestamp / showTimestampPreview` の正式Rendererへ接続します。
+`app-quality-v21.js`、`timestamp-polish-v21.js`、`library-tools-v22.js` 等のVersion別Patch Runtimeは本番から退役済みです。現在機能は上記Canonical Runtimeへ統合します。
 
-v2.4ではRepoに存在していた一部UI Moduleが本番Runtimeから外れていたため、v3のStatic CheckではRuntime接続も検査します。
+## データ保護
+
+- `save()` はStorage write失敗を成功扱いせず、最後に保存できた状態へ戻す
+- JSON Importは現在データを置換する前に型・件数・ID・YouTube動画ID・参照を検証する
+- Import JSON由来の任意HTMLや任意FieldをDOMへ引き継がない
+- Import / Delete / Restore前にローカルSnapshotを利用する
+- Snapshot Restore後は `asmrtube.snapshot.beforeRestore.v1` から復元前状態へ戻せる
+- 重要なデータはJSON Exportを独立Backupとして使用する
+
+## Tests / CI
+
+```text
+tests/
+├ browser-smoke.html
+├ core-utils.test.mjs
+├ static-check.mjs
+├ timestamp-cases.json
+├ timestamp-parser.test.html
+└ timestamp-parser.test.mjs
+```
+
+GitHub Actions: `.github/workflows/quality-check.yml`
+
+確認対象:
+
+- JavaScript syntax / JSON parse
+- index.html local reference
+- App / Guide / Schema Version整合
+- Canonical Runtime接続とLegacy Patch不在
+- Timestamp Parser regression
+- YouTube URL / Import validation
+- Storage / Recovery / Diagnostics guard
+- Headless Chromeによる主要導線Smoke
+  - Library render / item select
+  - Settings open / close
+  - Canonical timestamp import
+  - Dashboard exit topbar restore
+  - Thumbnail-off image suppression
+  - Focused buttonのSpaceキー非横取り
 
 ## Visual Source of Truth
 
@@ -175,48 +173,15 @@ workspace.css   Library / Media Deck / Sound Map composition
 settings.css    Dedicated settings page
 ```
 
-旧CSSは互換Layerとして残りますが、v3の見た目は上記を最後に読み込んで決定します。
-
 Visual判断・不採用理由・変更条件は `docs/VISUAL_BASELINE.md` と `PROJECT_LEARNINGS.md` を確認してください。
-
-## 回帰テスト / CI
-
-```text
-tests/
-├ timestamp-cases.json
-├ timestamp-parser.test.html
-└ static-check.mjs
-```
-
-GitHub Actions:
-
-```text
-.github/workflows/quality-check.yml
-```
-
-確認対象:
-
-- JavaScript syntax
-- JSON parse
-- index.html local reference
-- App / Guide / Schema Version整合
-- v3 CSS load order
-- settings page存在
-- theme selector 6種類
-- appearance.js接続
-- Product Shell接続
-- timestamp-ui.js接続
-- v2.1 / v2.2 Runtime維持
-
-PR #4では、JavaScript / JSON共通BaselineとASMRTube Static Checkが **success** しています。
 
 ## 現在の確認状態
 
 - Implemented: Yes
 - Library Schema change: No
 - Existing storage key change: No
-- PR Static Validation: Passed
-- Browser / Screenshot visual review: Not verified
+- Static / Unit / Browser Smoke: CIで確認
 - Mobile real-device: Not verified
+- User-facing Visual: User review pending
 
 User-facing Visualは、実際のGitHub Pages画面を見てユーザー確認されるまでは完成扱いにしません。

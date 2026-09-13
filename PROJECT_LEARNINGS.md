@@ -2,6 +2,72 @@
 
 この文書は、日々の変更履歴ではなく、今後のASMRTube修正で再利用価値が高い判断・失敗・成功を残す長期メモです。
 
+## L-004 Version別Patchの存在と正式Runtime接続を別物として扱う
+
+- **Date:** 2026-09-13
+- **Type:** Architecture / Reliability / Security / Testing
+- **Guide candidate:** no — `web-project-guide` の F-001 / F-004 / F-008 / F-012 と Architecture / Maintenanceへ既に一般化済み
+
+### Symptom
+
+v3として見えるサイトの内部では、`app.js` の旧Timestamp Parser、`app-quality-v21.js`、`timestamp-polish-v21.js`、`library-tools-v22.js`、v2 Product Shell等が読み込み順で同じ責務を上書きしていた。
+
+その結果、Repositoryには高機能な`timestamp-parser.js`が存在してもコメント取込Buttonは旧Parserを呼び、Version表示も複数Scriptがv2.xへ書き換え得る状態だった。Static Checkは「Fileが接続されていること」を確認していたが、実際の操作がCanonical実装へ到達することまでは保証していなかった。
+
+同時にJSON Importは外部DataのID / videoIdを十分に正規化せずDOM属性へ流し得て、Storage write失敗もUserへ成功と誤認させる余地があった。
+
+### Expected / Actual
+
+- **Expected:** FactごとにOwnerが1つあり、UI操作はCanonical Parser / Player Adapter / Storage Contractを通る
+- **Actual:** 後続PatchがGlobal関数を上書きし、どの実装が実際に使われるかがLoad order依存だった
+
+### Trigger / Detection
+
+- Current `index.html` Runtime順と各ScriptのGlobal再定義を突合
+- Parser test page / CI wiringを確認
+- Import → render、save failure、keyboard shortcut、dashboard exit等をCode pathで追跡
+
+### Root Cause
+
+過去の小改善をVersion別Patchとして追加し続け、正式Ownerへ統合・Retireする工程が不足していた。またStatic Validationが「存在 / 読込」中心で、主要User FlowのBehavioral Oracleを持っていなかった。
+
+### Final Fix
+
+- App Version / Build / Schemaは`app-config.js`だけを正本にする
+- Timestamp Importは`timestamp-parser.js`だけをParser Ownerにする
+- YouTubeは`youtube-runtime.js`をAdapterとして公開し、`selectItem / playItem`のMonkey Patchを廃止
+- `app-quality-v21.js / timestamp-polish-v21.js / library-tools-v22.js`等のVersion別Patch Runtimeを削除し、正式`app.js / timestamp-ui.js / library-tools.js`へ統合
+- JSON Importを`core-utils.js`のvalidate / normalize経路へ限定
+- Storage write failureを成功扱いせずLast Durable Stateへ戻す
+- `MutationObserver`で自前DOMを後付けせず、明示Eventへ接続
+- Node regression test + Headless Chrome smokeをCIへ追加し、実操作がCanonical経路へ到達することを確認
+- Local bounded Runtime Diagnosticsを追加
+
+### Affected files / systems
+
+`index.html`, `app-config.js`, `app.js`, `core-utils.js`, `diagnostics.js`, `youtube-runtime.js`, `ui-enhancements.js`, `appearance.js`, `library-tools.js`, `timestamp-parser.js`, Tests / CI / Documentation
+
+### Cost / Severity
+
+High。Parser機能欠落、Storage durability、Import security、Version drift、回帰検出不足が同じArchitecture debtから派生していた。
+
+### Regression Guard
+
+- `tests/static-check.mjs` がLegacy Patch Runtimeの再混入とMonkey Patch / Observer再導入をFailにする
+- `tests/timestamp-parser.test.mjs` がParserケースをNode上で検証する
+- `tests/core-utils.test.mjs` がYouTube URL / Import sanitizationを検証する
+- `tests/browser-smoke.html` がLibrary / Settings / Parser / Dashboard / Thumbnail-off / Keyboard flowを実Browserで通す
+
+### Prevention
+
+- 「Fileを作った」「index.htmlから読んだ」をFeature完成の証拠にしない
+- 同じ責務のVersion別Scriptを次の標準修正経路にしない
+- first-party DOMはRenderer / Event Contractで更新し、MutationObserver Patchを常設しない
+- External / Imported Dataはvalidate → normalize → commit後にのみCanonical Dataへ入れる
+- Static CheckとBrowser Behaviorを役割分担させる
+
+---
+
 ## L-003 Startup observerは自分が変更するDOMを監視しない
 
 - **Date:** 2026-09-13
@@ -26,8 +92,9 @@ Chrome Task ManagerではASMRTubeタブのCPUが100%を大きく超える一方�
 
 - `app-config.js` のDocument-wide `MutationObserver` を削除
 - Version表示は `DOMContentLoaded` 後のone-shot処理に限定
-- YouTube reliability runtimeの遅延読込はそのまま維持
+- YouTube IFrame APIをCritical Pathから外す方針を維持
 - Buildを `20260913-1` へ更新
+- **2026-09-13追記:** L-004でLocal Adapter自体は通常Runtimeへ統合し、外部YouTube IFrame APIだけをOn-demand loadする構造へ整理した
 
 ### Regression Guard
 
