@@ -77,7 +77,7 @@ if(!app.includes('if(file.size>5*1024*1024)'))fail('JSON import file-size guard 
 if(!app.includes("asmrtube:save-failed")||!app.includes('restoreDurableState()'))fail('save failure rollback/feedback is missing');
 if(!app.includes('scheduleVolumeSave()')||!app.includes('flushVolumeSave()'))fail('volume persistence must be debounced and flushed');
 if(!app.includes('invalidateItem?.(editId)'))fail('changing a video URL must invalidate loaded player state');
-if(!app.includes("element.closest('button,a,input,textarea,select"))fail('playback shortcuts must ignore focused interactive controls');
+if(!app.includes("target?.closest?.('button,a,input,textarea,select"))fail('playback shortcuts must ignore focused interactive controls');
 if(!app.includes('function thumbnailsEnabled()')||!app.includes("showThumbs!==false"))fail('thumbnail suppression must avoid creating image requests, including first render');
 if(!shell.includes('PRE_RESTORE_KEY')||!shell.includes('snapshotUndoRestoreBtn'))fail('pre-restore recovery UI is missing');
 if(!shell.includes('renderSelection()'))fail('dashboard exit must restore canonical topbar selection');
