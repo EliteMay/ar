@@ -4,39 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ASMRTube Timestamp Parser Tests</title>
-  <style>
-    body{font-family:system-ui,sans-serif;background:#0a0b0e;color:#f4f5f7;margin:0;padding:24px}
-    main{max-width:960px;margin:auto}.summary{padding:14px;border:1px solid #2a2e38;border-radius:10px;background:#111318;margin-bottom:14px}
-    .case{padding:12px 14px;margin:8px 0;border:1px solid #262b34;border-radius:10px;background:#111318}.ok{border-color:#315d43}.ng{border-color:#783d47}
-    pre{white-space:pre-wrap;word-break:break-word;color:#b9c0cb;font-size:12px}.muted{color:#8b929e}
-  </style>
-  <script>window.__ASMRTUBE_PARSER_ONLY__=true;</script>
-  <script src="../timestamp-parser.js?v=1.9"></script>
+  <style>body{font-family:system-ui,sans-serif;background:#0a0b0e;color:#f4f5f7;margin:0;padding:24px}main{max-width:960px;margin:auto}.summary,.case{padding:12px 14px;margin:8px 0;border:1px solid #262b34;border-radius:10px;background:#111318}.ok{border-color:#315d43}.ng{border-color:#783d47}pre{white-space:pre-wrap;word-break:break-word;color:#b9c0cb;font-size:12px}.muted{color:#8b929e}</style>
+  <script src="../timestamp-parser.js"></script>
 </head>
-<body>
-<main>
-  <h1>Timestamp Parser Regression Tests</h1>
-  <div id="summary" class="summary">実行中…</div>
-  <div id="results"></div>
-</main>
+<body><main><h1>Timestamp Parser Regression Tests</h1><div id="summary" class="summary">実行中…</div><div id="results"></div></main>
 <script>
 (async()=>{
-  const cases=await fetch('./timestamp-cases.json?v=1.9').then(r=>r.json());
-  const results=document.querySelector('#results');
-  let passed=0;
-  const partialMatch=(actual,expected)=>Object.entries(expected).every(([k,v])=>actual?.[k]===v);
-  for(const test of cases){
-    const actual=parseTimestampText(test.input);
-    const ok=test.expected.length===actual.length&&test.expected.every((exp,i)=>partialMatch(actual[i],exp));
-    if(ok)passed++;
-    const div=document.createElement('section');
-    div.className=`case ${ok?'ok':'ng'}`;
-    div.innerHTML=`<strong>${ok?'PASS':'FAIL'} — ${test.name}</strong><pre>${escapeHtml(JSON.stringify(actual,null,2))}</pre>`;
-    results.appendChild(div);
-  }
-  document.querySelector('#summary').innerHTML=`<strong>${passed}/${cases.length} PASS</strong><div class="muted">timestamp-parser.js v1.9 regression suite</div>`;
-  function escapeHtml(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
-})().catch(err=>{document.querySelector('#summary').textContent=`テスト実行エラー: ${err.message}`});
-</script>
-</body>
-</html>
+  const parse=window.ASMRTubeTimestampParser?.parse;if(typeof parse!=='function')throw new Error('ASMRTubeTimestampParser.parse is unavailable');
+  const cases=await fetch('./timestamp-cases.json').then(r=>{if(!r.ok)throw new Error(`cases HTTP ${r.status}`);return r.json()});
+  const results=document.querySelector('#results');let passed=0;
+  const partial=(actual,expected)=>Object.entries(expected).every(([k,v])=>actual?.[k]===v);
+  for(const test of cases){const actual=parse(test.input);const ok=test.expected.length===actual.length&&test.expected.every((exp,i)=>partial(actual[i],exp));if(ok)passed++;const div=document.createElement('section');div.className=`case ${ok?'ok':'ng'}`;const strong=document.createElement('strong');strong.textContent=`${ok?'PASS':'FAIL'} — ${test.name}`;const pre=document.createElement('pre');pre.textContent=JSON.stringify(actual,null,2);div.append(strong,pre);results.appendChild(div)}
+  document.querySelector('#summary').innerHTML=`<strong>${passed}/${cases.length} PASS</strong><div class="muted">canonical timestamp-parser.js regression suite</div>`;
+})().catch(error=>{document.querySelector('#summary').textContent=`テスト実行エラー: ${error.message}`});
+</script></body></html>
